@@ -1,0 +1,54 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.graphaware.nlp.processor.opennlp;
+
+import java.util.Properties;
+
+class PipelineBuilder {
+
+    private static final String CUSTOM_STOP_WORD_LIST = "start,starts,period,periods,a,an,and,are,as,at,be,but,by,for,if,in,into,is,it,no,not,of,o,on,or,such,that,the,their,then,there,these,they,this,to,was,will,with";
+
+    private final Properties properties = new Properties();
+    private final StringBuilder annotattors = new StringBuilder(); //basics annotators
+    private int threadsNumber = 4;
+
+    public PipelineBuilder tokenize() {
+        return this;
+    }
+
+    public PipelineBuilder extractSentiment() {
+        return this;
+    }
+
+    public PipelineBuilder extractRelations() {
+        return this;
+    }
+
+    public PipelineBuilder extractCoref() {
+        return this;
+    }
+
+    public PipelineBuilder defaultStopWordAnnotator() {
+        return this;
+    }
+
+    public PipelineBuilder customStopWordAnnotator(String customStopWordList) {
+        return this;
+    }
+
+    public PipelineBuilder stopWordAnnotator(Properties properties) {
+        return this;
+    }
+
+    public PipelineBuilder threadNumber(int threads) {
+        return this;
+    }
+
+    public OpenNLPPipeline build() {
+        OpenNLPPipeline pipeline = new OpenNLPPipeline(properties);
+        return pipeline;
+    }
+}
