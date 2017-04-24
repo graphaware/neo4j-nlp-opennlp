@@ -23,11 +23,13 @@ import com.graphaware.nlp.domain.Tag;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,21 +43,33 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
     public static final String PHRASE = "phrase";
 
+    public static final String backgroundSymbol = "O,MISC"; // default value (taken from StanfordNLP)
+
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
     private final Pattern patternCheck;
 
     public OpenNLPTextProcessor() {
         //Creating default pipeline
+        createTokenizerPipeline();
         createPhrasePipeline();
 
         String pattern = "\\p{Punct}";
         patternCheck = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE);
     }
 
+    private void createTokenizerPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                //.defaultStopWordAnnotator()
+                .threadNumber(6)
+                .build();
+        pipelines.put(TOKENIZER, pipeline);
+    }
+
     private void createPhrasePipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
-                .defaultStopWordAnnotator()
+                //.defaultStopWordAnnotator()
                 .extractSentiment()
                 .extractCoref()
                 .extractRelations()
@@ -100,7 +114,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
             int sentenceNumber = sentenceSequence.getAndIncrement();
             String sentenceId = id + "_" + sentenceNumber;
             final Sentence newSentence = new Sentence(sentence.toString(), store, sentenceId, sentenceNumber);
-            //extractTokens(sentence, newSentence);
+            extractTokens(lang, sentence, newSentence);
             //extractSentiment(sentence, newSentence);
             extractPhrases(sentence, newSentence);
             result.addSentence(newSentence);
@@ -122,60 +136,76 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //        newSentence.setSentiment(score);
 //    }
 
-//    protected void extractTokens(OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-//        String[] tokens = sentence.getWords();
-//        TokenHolder currToken = new TokenHolder();
-//        currToken.setNe(backgroundSymbol);
-//        tokens.stream()
-//                .filter((token) -> (token != null) && checkPuntuation(token.get(CoreAnnotations.LemmaAnnotation.class)))
-//                .map((token) -> {
-//                    //
-//                    String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
-//                    if (currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag tag = getTag(token);
-//                        if (tag != null) {
-//                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-//                        }
-//                    } else if (currentNe.equals(backgroundSymbol) && !currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag newTag = new Tag(currToken.getToken());
-//                        newTag.setNe(currToken.getNe());
-//                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(newTag));
-//                        currToken.reset();
-//                        Tag tag = getTag(token);
-//                        if (tag != null) {
-//                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-//                        }
-//                    } else if (!currentNe.equals(currToken.getNe()) && !currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag tag = new Tag(currToken.getToken());
-//                        tag.setNe(currToken.getNe());
-//                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-//                        currToken.reset();
-//                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    } else if (!currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-//                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    } else {
-//                        String before = StringUtils.getNotNullString(token.get(CoreAnnotations.BeforeAnnotation.class));
-//                        String currentText = StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class));
-//                        currToken.updateToken(before);
-//                        currToken.updateToken(currentText);
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    }
-//                    return currentNe;
-//                }).forEach((currentNe) -> {
-//            currToken.setNe(currentNe);
-//        });
-//
-//        if (currToken.getToken().length() > 0) {
-//            Tag tag = new Tag(currToken.getToken());
-//            tag.setNe(currToken.getNe());
-//            newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-//        }
-//    }
+    protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
+        // TO DO: lemma, named entities
+        String[] tokens = sentence.getWords();
+        String text = sentence.getSentence();
+        int len_text = text.length();
+        //System.out.println("Extracting tokens. Text length "+len_text+", # tokens " + tokens.length);
+        Arrays.asList(tokens).stream()
+                .filter(token -> token!=null && checkPuntuation(token))
+                .forEach(token -> {
+                    //System.out.println("Processing word: " + token);
+                    for (int i = -1; (i = text.indexOf(token, i + 1)) != -1;) {
+                      int end = i+token.replaceAll("\\s+","").length();
+                      //System.out.println("  occurence - " + i + ", " + end);
+                      Tag newTag = getTag(token, lang);
+                      newSentence.addTagOccurrence(i, end, newSentence.addTag(newTag));
+                    }
+                });
+        /*TokenHolder currToken = new TokenHolder();
+        currToken.setNe(backgroundSymbol);
+        Arrays.asList(tokens).stream()
+                .filter(token -> token!=null) // && checkPuntuation(token.get(CoreAnnotations.LemmaAnnotation.class)))
+                .map(token -> {
+                    //String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
+                    String currentNe = token;
+                    if (currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
+                        Tag tag = getTag(token, lang);
+                        if (tag != null) {
+                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
+                        }
+                    } else if (currentNe.equals(backgroundSymbol) && !currToken.getNe().equals(backgroundSymbol)) {
+                        Tag newTag = new Tag(currToken.getToken(), lang);
+                        newTag.setNe(currToken.getNe());
+                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(newTag));
+                        currToken.reset();
+                        Tag tag = getTag(token, lang);
+                        if (tag != null) {
+                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
+                        }
+                    } else if (!currentNe.equals(currToken.getNe()) && !currToken.getNe().equals(backgroundSymbol)) {
+                        Tag tag = new Tag(currToken.getToken(), lang);
+                        tag.setNe(currToken.getNe());
+                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
+                        currToken.reset();
+                        //currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
+                        currToken.updateToken(token);
+                        currToken.setBeginPosition(token.beginPosition());
+                        currToken.setEndPosition(token.endPosition());
+                    } else if (!currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
+                        //currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
+                        currToken.updateToken(token);
+                        currToken.setBeginPosition(token.beginPosition());
+                        currToken.setEndPosition(token.endPosition());
+                    } else {
+                        String before = StringUtils.getNotNullString(token.get(CoreAnnotations.BeforeAnnotation.class));
+                        String currentText = StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class));
+                        currToken.updateToken(before);
+                        currToken.updateToken(currentText);
+                        currToken.setBeginPosition(token.beginPosition());
+                        currToken.setEndPosition(token.endPosition());
+                    }
+                    return currentNe;
+                });
+                //.forEach(currentNe -> currToken.setNe(currentNe));
+
+        if (currToken.getToken().length() > 0) {
+            Tag tag = new Tag(currToken.getToken(), lang);
+            tag.setNe(currToken.getNe());
+            newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
+        }*/
+    }
 
 //    private void extractRelationship(AnnotatedText annotatedText, List<CoreMap> sentences, Annotation document) {
 //        Map<Integer, CorefChain> corefChains = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
@@ -293,6 +323,18 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //        LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
 //        return tag;
 //    }
+
+    private Tag getTag(String token, String lang) {
+      String pos = "NA"; // TO DO
+      String ne  = "NA"; // TO DO
+      String lemma = token; // TO DO
+
+      Tag tag = new Tag(token, lang);
+      tag.setPos(pos);
+      tag.setNe(pos);
+      LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
+      return tag;
+    }
 
     @Override
     public List<Tag> annotateTags(String text, String lang) {

@@ -55,7 +55,6 @@ public class OpenNLPPipeline {
     }
 
     private void init(Properties properties) {
-
         try {
             senteceSplitter(properties);
             tokenizer(properties);

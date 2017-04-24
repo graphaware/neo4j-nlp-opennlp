@@ -15,7 +15,15 @@ class PipelineBuilder {
     private final StringBuilder annotators = new StringBuilder(); //basics annotators
     private int threadsNumber = 4;
 
+    private void checkForExistingAnnotators() {
+        if (annotators.toString().length() > 0) {
+            annotators.append(", ");
+        }
+    }
+
     public PipelineBuilder tokenize() {
+        //checkForExistingAnnotators();
+        //annotators.append("tokenize, ssplit, pos, lemma, ner");
         return this;
     }
 
@@ -32,6 +40,10 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder defaultStopWordAnnotator() {
+        /*checkForExistingAnnotators();
+        annotators.append("stopword");
+        properties.setProperty("customAnnotatorClass.stopword", StopwordAnnotator.class.getName());
+        properties.setProperty(StopwordAnnotator.STOPWORDS_LIST, CUSTOM_STOP_WORD_LIST);*/
         return this;
     }
 
@@ -44,6 +56,7 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder threadNumber(int threads) {
+        this.threadsNumber = threads;
         return this;
     }
 
