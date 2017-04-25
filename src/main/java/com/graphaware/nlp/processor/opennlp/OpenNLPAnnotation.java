@@ -6,7 +6,9 @@
 package com.graphaware.nlp.processor.opennlp;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import opennlp.tools.util.Span;
 
 /**
@@ -44,10 +46,12 @@ public class OpenNLPAnnotation {
         private final Span sentence;
         private final String sentenceText;
         private List<Integer> nounphrases;
-        String[] words;
-        String[] posTags;
-        Span[] chunks;
-        String[] chunkStrings;
+        private String[] words;
+        private Span[] wordSpans;
+        private String[] posTags;
+        private Span[] chunks;
+        private String[] chunkStrings;
+        private String[] namedEntities;
 
         public Sentence(Span sentence, String text) {
             this.sentence = sentence;
@@ -77,6 +81,37 @@ public class OpenNLPAnnotation {
             this.words = words;
         }
 
+        public Span[] getWordSpans() {
+            return this.wordSpans;
+        }
+
+        public void setWordsAndSpans(Span[] spans) {
+          if (spans==null) {
+            this.wordSpans = null;
+            this.words = null;
+            return;
+          }
+          this.wordSpans = spans;
+          this.words = new String[this.wordSpans.length];
+          this.words = Arrays.asList(spans).stream()
+                        .map(span -> new String(this.sentenceText.substring(span.getStart(), span.getEnd())))
+                        .collect(Collectors.toList()).toArray(this.words);
+        }
+
+        public int getWordStart(int idx) {
+          int i = -1;
+          if (this.wordSpans.length>idx)
+            i = this.wordSpans[idx].getStart();
+          return i;
+        }
+
+        public int getWordEnd(int idx) {
+          int i = -1;
+          if (this.wordSpans.length>idx)
+            i = this.wordSpans[idx].getEnd();
+          return i;
+        }
+
         public String[] getPosTags() {
             return posTags;
         }
@@ -103,6 +138,19 @@ public class OpenNLPAnnotation {
 
         public List<Integer> getPhrasesIndex() {
             return nounphrases;
+        }
+
+        public String[] getNamedEntities() {
+          return this.namedEntities;
+        }
+
+        public void setNamedEntity(int idxStart, int idxEnd, String type) {
+          if (this.words.length==0)   // words/tokens must be extracted before Named Entities can be saved
+            return;
+          if (this.namedEntities.length==0)
+            this.namedEntities = new String[this.words.length];
+          for (int i=idxStart; i<idxEnd && i<this.words.length; i++)
+            this.namedEntities[i] = type;
         }
     }
 }

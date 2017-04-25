@@ -14,6 +14,8 @@ import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
+import java.util.HashMap;
+import java.util.Arrays;
 import opennlp.tools.chunker.ChunkerME;
 import opennlp.tools.chunker.ChunkerModel;
 import opennlp.tools.postag.POSModel;
@@ -22,6 +24,8 @@ import opennlp.tools.sentdetect.SentenceDetectorME;
 import opennlp.tools.sentdetect.SentenceModel;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
+import opennlp.tools.namefind.TokenNameFinderModel;
+import opennlp.tools.namefind.NameFinderME;
 import opennlp.tools.util.Span;
 import opennlp.tools.util.model.BaseModel;
 import org.slf4j.Logger;
@@ -43,6 +47,16 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
     public static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
 
+    // Named Entities: mapping from labels to models
+    public static HashMap<String, String> PROPERTY_NE_MODELS = new HashMap<>();
+
+    // Named Entities: mapping from labels to identifiers that are used in the graph
+    public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
+    public static final String PROPERTY_DEFAULT_NE = "miscellaneous";
+
+    // Named Entities: objects
+    public HashMap<String, NameFinderME> nameDetector = new HashMap<String, NameFinderME>();
+
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
     private TokenizerME wordBreaker;
@@ -51,6 +65,28 @@ public class OpenNLPPipeline {
     private SentenceDetectorME sentenceDetector;
 
     public OpenNLPPipeline(Properties properties) {
+        // Named Entities: mapping from labels to models
+        PROPERTY_NE_MODELS = new HashMap<String, String>();
+        PROPERTY_NE_MODELS.put("namefinder", "en-ner-person.bin");
+        PROPERTY_NE_MODELS.put("datefinder", "en-ner-date.bin");
+        PROPERTY_NE_MODELS.put("locationfinder", "en-ner-location.bin");
+        PROPERTY_NE_MODELS.put("timefinder", "en-ner-time.bin");
+        PROPERTY_NE_MODELS.put("organizationfinder", "en-ner-organization.bin");
+        PROPERTY_NE_MODELS.put("moneyfinder", "en-ner-money.bin");
+        PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");
+
+        // Named Entities: mapping from labels to identifiers that are used in the graph
+        PROPERTY_NE_IDS = new HashMap<String, String>();
+        PROPERTY_NE_IDS.put("namefinder", "person");
+        PROPERTY_NE_IDS.put("datefinder", "date");
+        PROPERTY_NE_IDS.put("locationfinder", "location");
+        PROPERTY_NE_IDS.put("timefinder", "time");
+        PROPERTY_NE_IDS.put("organizationfinder", "organization");
+        PROPERTY_NE_IDS.put("moneyfinder", "money");
+        PROPERTY_NE_IDS.put("percentagefinder", "percentage");
+
+        nameDetector = new HashMap<String, NameFinderME>();
+
         init(properties);
     }
 
@@ -60,6 +96,7 @@ public class OpenNLPPipeline {
             tokenizer(properties);
             posTagger(properties);
             chuncker(properties);
+            namedEntitiesFinders(properties);
 
         } catch (IOException e) {
             LOG.error("Could not initialize OpenNLP models: " + e.getMessage());
@@ -91,6 +128,14 @@ public class OpenNLPPipeline {
         sentenceDetector = new SentenceDetectorME(sentenceModel);
     }
 
+    private void namedEntitiesFinders(Properties properties) throws FileNotFoundException {
+        for (String key : PROPERTY_NE_MODELS.keySet()) {
+          InputStream is = getInputStream(properties, key, PROPERTY_NE_MODELS.get(key));
+          TokenNameFinderModel nameModel = loadModel(TokenNameFinderModel.class, is);
+          nameDetector.put(key, new NameFinderME(nameModel));
+        }
+    }
+
     public void annotate(OpenNLPAnnotation document) {
 
         String text = document.getText();
@@ -99,18 +144,30 @@ public class OpenNLPPipeline {
             document.setSentences(sentences);
 
             document.getSentences().stream().forEach((sentence) -> {
-                String[] words = wordBreaker.tokenize(sentence.getSentence());
-                sentence.setWords(words);
-                String[] posTags = posme.tag(words);
+                // Tokenization
+                //String[] words = wordBreaker.tokenize(sentence.getSentence());
+                //sentence.setWords(words); // replaced by calling 'setWordsAndSpans()'
+                Span[] word_spans = wordBreaker.tokenizePos(sentence.getSentence());
+                sentence.setWordsAndSpans(word_spans);
+
+                // Part of Speach
+                String[] posTags = posme.tag(sentence.getWords());
                 sentence.setPosTags(posTags);
-                Span[] chunks = chunkerME.chunkAsSpans(words, posTags);
+
+                // Chunking
+                Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
                 sentence.setChunks(chunks);
-                String[] chunkStrings = Span.spansToStrings(chunks, words);
+                String[] chunkStrings = Span.spansToStrings(chunks, sentence.getWords());
                 sentence.setChunkStrings(chunkStrings);
                 for (int i = 0; i < chunks.length; i++) {
-                    //if (chunks[i].getType().equals("NP")) {
+                    //if (chunks[i].getType().equals("NP"))
                         sentence.addPhraseIndex(i);
-                    //}
+                }
+
+                // Named Entities identification
+                for (String key : PROPERTY_NE_MODELS.keySet()) {
+                  Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
+                        .forEach(span -> sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType()));
                 }
             });
         } catch (Exception ex) {
@@ -134,11 +191,8 @@ public class OpenNLPPipeline {
         String path = properties.getProperty(property, defaultValue);
         InputStream is;
         try {
-
             if (path.startsWith("file://")) {
-
                 is = new FileInputStream(new File(new URI(path)));
-
             } else if (path.startsWith("/")) {
                 is = new FileInputStream(new File(path));
             } else {

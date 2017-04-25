@@ -39,6 +39,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
     public static final String TOKENIZER = "tokenizer";
+    public static final String POS = "pos";
     public static final String SENTIMENT = "sentiment";
     public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
     public static final String PHRASE = "phrase";
@@ -49,8 +50,9 @@ public class OpenNLPTextProcessor implements TextProcessor {
     private final Pattern patternCheck;
 
     public OpenNLPTextProcessor() {
-        //Creating default pipeline
+        //Creating default pipelines
         createTokenizerPipeline();
+        createPosPipeline();
         createPhrasePipeline();
 
         String pattern = "\\p{Punct}";
@@ -64,6 +66,15 @@ public class OpenNLPTextProcessor implements TextProcessor {
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER, pipeline);
+    }
+
+    private void createPosPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                //.tokenize()
+                //.defaultStopWordAnnotator()
+                .threadNumber(6)
+                .build();
+        pipelines.put(POS, pipeline);
     }
 
     private void createPhrasePipeline() {
@@ -140,26 +151,23 @@ public class OpenNLPTextProcessor implements TextProcessor {
         // TO DO: lemma, named entities
         String[] tokens = sentence.getWords();
         String text = sentence.getSentence();
-        int len_text = text.length();
-        //System.out.println("Extracting tokens. Text length "+len_text+", # tokens " + tokens.length);
-        Arrays.asList(tokens).stream()
-                .filter(token -> token!=null && checkPuntuation(token))
-                .forEach(token -> {
-                    //System.out.println("Processing word: " + token);
-                    for (int i = -1; (i = text.indexOf(token, i + 1)) != -1;) {
-                      int end = i+token.replaceAll("\\s+","").length();
-                      //System.out.println("  occurence - " + i + ", " + end);
-                      Tag newTag = getTag(token, lang);
-                      newSentence.addTagOccurrence(i, end, newSentence.addTag(newTag));
-                    }
-                });
+        //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
+        int idx = -1;
+        for (String token : tokens) {
+          idx++;
+          if (token==null || !checkPuntuation(token))
+            continue;
+          //System.out.println("Processing word: " + token);
+          Tag newTag = getTag(sentence, idx, lang);
+          newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
+        }
+
         /*TokenHolder currToken = new TokenHolder();
         currToken.setNe(backgroundSymbol);
         Arrays.asList(tokens).stream()
                 .filter(token -> token!=null) // && checkPuntuation(token.get(CoreAnnotations.LemmaAnnotation.class)))
                 .map(token -> {
-                    //String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
-                    String currentNe = token;
+                    String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
                     if (currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
                         Tag tag = getTag(token, lang);
                         if (tag != null) {
@@ -179,13 +187,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
                         tag.setNe(currToken.getNe());
                         newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
                         currToken.reset();
-                        //currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-                        currToken.updateToken(token);
+                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
                         currToken.setBeginPosition(token.beginPosition());
                         currToken.setEndPosition(token.endPosition());
                     } else if (!currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-                        //currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-                        currToken.updateToken(token);
+                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
                         currToken.setBeginPosition(token.beginPosition());
                         currToken.setEndPosition(token.endPosition());
                     } else {
@@ -198,7 +204,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
                     }
                     return currentNe;
                 });
-                //.forEach(currentNe -> currToken.setNe(currentNe));
+                .forEach(currentNe -> currToken.setNe(currentNe));
 
         if (currToken.getToken().length() > 0) {
             Tag tag = new Tag(currToken.getToken(), lang);
@@ -324,12 +330,18 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //        return tag;
 //    }
 
-    private Tag getTag(String token, String lang) {
-      String pos = "NA"; // TO DO
-      String ne  = "NA"; // TO DO
-      String lemma = token; // TO DO
+    private Tag getTag(OpenNLPAnnotation.Sentence sentence, int tokenIdx, String lang) {
+      String pos = " - ";
+      String ne  = " - ";
+      String lemma = sentence.getWords()[tokenIdx]; // TO DO
 
-      Tag tag = new Tag(token, lang);
+      if (sentence.getPosTags()!=null)
+        pos = sentence.getPosTags()[tokenIdx]; // TO DO: try ... catch
+
+      if (sentence.getNamedEntities()!=null)
+        ne = sentence.getNamedEntities()[tokenIdx]; // TO DO: try ... catch
+
+      Tag tag = new Tag(lemma, lang);
       tag.setPos(pos);
       tag.setNe(pos);
       LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
