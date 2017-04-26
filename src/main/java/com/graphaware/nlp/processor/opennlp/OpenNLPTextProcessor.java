@@ -308,42 +308,41 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-//    private Tag getTag(CoreLabel token) {
-//        Pair<Boolean, Boolean> stopword = token.get(StopwordAnnotator.class);
-//        if (stopword.first()) {
-//            return null;
-//        }
-//        String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
-//        String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
-//        String lemma;
-//
-//        if (ne.equals(backgroundSymbol)) {
-//            lemma = token.get(CoreAnnotations.LemmaAnnotation.class);
-//        } else {
-//            lemma = token.get(CoreAnnotations.OriginalTextAnnotation.class);
-//        }
-//
-//        Tag tag = new Tag(lemma);
-//        tag.setPos(pos);
-//        tag.setNe(ne);
-//        LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
-//        return tag;
-//    }
-
     private Tag getTag(OpenNLPAnnotation.Sentence sentence, int tokenIdx, String lang) {
-      String pos = " - ";
-      String ne  = " - ";
-      String lemma = sentence.getWords()[tokenIdx]; // TO DO
+      String pos = "-";
+      String ne  = "-";
+      String lemma = sentence.getWords()[tokenIdx];
 
-      if (sentence.getPosTags()!=null)
-        pos = sentence.getPosTags()[tokenIdx]; // TO DO: try ... catch
+      if (sentence.getPosTags()!=null) {
+        try {
+          if (sentence.getPosTags()[tokenIdx]!=null)
+            pos = sentence.getPosTags()[tokenIdx]; // TO DO: try ... catch
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of POS tags.", tokenIdx);
+        }
+      }
 
-      if (sentence.getNamedEntities()!=null)
-        ne = sentence.getNamedEntities()[tokenIdx]; // TO DO: try ... catch
+      if (sentence.getNamedEntities()!=null) {
+        try {
+          if (sentence.getNamedEntities()[tokenIdx]!=null)
+            ne = sentence.getNamedEntities()[tokenIdx]; // TO DO: try ... catch
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of named entities.", tokenIdx);
+        }
+      }
+
+      if (sentence.getLemmas()!=null) {
+        try {
+          if (sentence.getLemmas()[tokenIdx]!="O") // "0" is default lemma value if there's no match with dictionary, in which case we want to keep the original word
+            lemma = sentence.getLemmas()[tokenIdx];
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of lemmas.", tokenIdx);
+        }
+      }
 
       Tag tag = new Tag(lemma, lang);
       tag.setPos(pos);
-      tag.setNe(pos);
+      tag.setNe(ne);
       LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
       return tag;
     }

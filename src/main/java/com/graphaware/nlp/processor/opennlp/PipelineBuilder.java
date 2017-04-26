@@ -27,6 +27,10 @@ class PipelineBuilder {
         return this;
     }
 
+    public PipelineBuilder lemmatize() {
+      return this;
+    }
+
     public PipelineBuilder extractSentiment() {
         return this;
     }

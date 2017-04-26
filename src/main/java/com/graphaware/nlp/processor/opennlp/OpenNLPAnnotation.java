@@ -49,6 +49,7 @@ public class OpenNLPAnnotation {
         private String[] words;
         private Span[] wordSpans;
         private String[] posTags;
+        private String[] lemmas;
         private Span[] chunks;
         private String[] chunkStrings;
         private String[] namedEntities;
@@ -145,12 +146,34 @@ public class OpenNLPAnnotation {
         }
 
         public void setNamedEntity(int idxStart, int idxEnd, String type) {
-          if (this.words.length==0)   // words/tokens must be extracted before Named Entities can be saved
+          if (this.words==null)  // words/tokens must be extracted before Named Entities can be saved
             return;
-          if (this.namedEntities.length==0)
+          if (this.namedEntities==null)
             this.namedEntities = new String[this.words.length];
           for (int i=idxStart; i<idxEnd && i<this.words.length; i++)
-            this.namedEntities[i] = type;
+            if (this.namedEntities[i]==null) // we don't want to override a possible positive result from previous NamedEntity identification attempts
+              this.namedEntities[i] = type;
+        }
+
+        public String[] getLemmas() {
+          return this.lemmas;
+        }
+
+        public void setLemmas(String[] lemmas) {
+          if (this.words==null || lemmas==null)
+            return;
+          if (this.words.length!=lemmas.length) // ... something is wrong
+            return;
+          this.lemmas = lemmas;
+        }
+
+        public void setLemma(int idx, String lemma) {
+          if (this.words==null)
+            return;
+          if (this.lemmas==null)
+            this.lemmas = new String[this.words.length];
+          if (idx<this.lemmas.length)
+            lemmas[idx] = lemma;
         }
     }
 }

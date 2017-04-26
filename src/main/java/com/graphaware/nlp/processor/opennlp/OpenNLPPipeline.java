@@ -26,6 +26,10 @@ import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.namefind.TokenNameFinderModel;
 import opennlp.tools.namefind.NameFinderME;
+import opennlp.tools.lemmatizer.LemmatizerModel;      // needs OpenNLP >=1.7
+import opennlp.tools.lemmatizer.LemmatizerME;         // needs OpenNLP >=1.7
+import opennlp.tools.lemmatizer.DictionaryLemmatizer; // needs OpenNLP >=1.7
+//import opennlp.tools.lemmatizer.SimpleLemmatizer;   // for OpenNLP < 1.7
 import opennlp.tools.util.Span;
 import opennlp.tools.util.model.BaseModel;
 import org.slf4j.Logger;
@@ -41,18 +45,19 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_PATH_POS_TAGGER_MODEL = "pos";
     public static final String PROPERTY_PATH_SENTENCE_MODEL = "sentence";
     public static final String PROPERTY_PATH_TOKENIZER_MODEL = "tokenizer";
+    public static final String PROPERTY_PATH_LEMMATIZER_MODEL = "lemmatizer";
 
     public static final String PROPERTY_DEFAULT_CHUNKER_MODEL = "en-chunker.bin";
     public static final String PROPERTY_DEFAULT_POS_TAGGER_MODEL = "en-pos-maxent.bin";
     public static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
     public static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
+    public static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
 
     // Named Entities: mapping from labels to models
     public static HashMap<String, String> PROPERTY_NE_MODELS = new HashMap<>();
 
     // Named Entities: mapping from labels to identifiers that are used in the graph
-    public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
-    public static final String PROPERTY_DEFAULT_NE = "miscellaneous";
+    //public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
 
     // Named Entities: objects
     public HashMap<String, NameFinderME> nameDetector = new HashMap<String, NameFinderME>();
@@ -63,6 +68,9 @@ public class OpenNLPPipeline {
     private POSTaggerME posme;
     private ChunkerME chunkerME;
     private SentenceDetectorME sentenceDetector;
+    //private LemmatizerME lemmaDetector;
+    private DictionaryLemmatizer lemmaDetector; // needs OpenNLP >=1.7
+    //private SimpleLemmatizer lemmaDetector; // for OpenNLP < 1.7
 
     public OpenNLPPipeline(Properties properties) {
         // Named Entities: mapping from labels to models
@@ -76,14 +84,14 @@ public class OpenNLPPipeline {
         PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");
 
         // Named Entities: mapping from labels to identifiers that are used in the graph
-        PROPERTY_NE_IDS = new HashMap<String, String>();
+        /*PROPERTY_NE_IDS = new HashMap<String, String>();
         PROPERTY_NE_IDS.put("namefinder", "person");
         PROPERTY_NE_IDS.put("datefinder", "date");
         PROPERTY_NE_IDS.put("locationfinder", "location");
         PROPERTY_NE_IDS.put("timefinder", "time");
         PROPERTY_NE_IDS.put("organizationfinder", "organization");
         PROPERTY_NE_IDS.put("moneyfinder", "money");
-        PROPERTY_NE_IDS.put("percentagefinder", "percentage");
+        PROPERTY_NE_IDS.put("percentagefinder", "percentage");*/
 
         nameDetector = new HashMap<String, NameFinderME>();
 
@@ -97,6 +105,7 @@ public class OpenNLPPipeline {
             posTagger(properties);
             chuncker(properties);
             namedEntitiesFinders(properties);
+            lemmatizer(properties);
 
         } catch (IOException e) {
             LOG.error("Could not initialize OpenNLP models: " + e.getMessage());
@@ -107,24 +116,28 @@ public class OpenNLPPipeline {
     protected void chuncker(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_CHUNKER_MODEL, PROPERTY_DEFAULT_CHUNKER_MODEL);
         ChunkerModel chunkerModel = loadModel(ChunkerModel.class, is);
+        closeInputStream(is, PROPERTY_PATH_CHUNKER_MODEL);
         chunkerME = new ChunkerME(chunkerModel);
     }
 
     private void posTagger(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_POS_TAGGER_MODEL, PROPERTY_DEFAULT_POS_TAGGER_MODEL);
         POSModel pm = loadModel(POSModel.class, is);
+        closeInputStream(is, PROPERTY_PATH_POS_TAGGER_MODEL);
         posme = new POSTaggerME(pm);
     }
 
     private void tokenizer(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_TOKENIZER_MODEL, PROPERTY_DEFAULT_TOKENIZER_MODEL);
         TokenizerModel tm = loadModel(TokenizerModel.class, is);
+        closeInputStream(is, PROPERTY_PATH_TOKENIZER_MODEL);
         wordBreaker = new TokenizerME(tm);
     }
 
     private void senteceSplitter(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_SENTENCE_MODEL, PROPERTY_DEFAULT_SENTENCE_MODEL);
         SentenceModel sentenceModel = loadModel(SentenceModel.class, is);
+        closeInputStream(is, PROPERTY_PATH_SENTENCE_MODEL);
         sentenceDetector = new SentenceDetectorME(sentenceModel);
     }
 
@@ -132,8 +145,18 @@ public class OpenNLPPipeline {
         for (String key : PROPERTY_NE_MODELS.keySet()) {
           InputStream is = getInputStream(properties, key, PROPERTY_NE_MODELS.get(key));
           TokenNameFinderModel nameModel = loadModel(TokenNameFinderModel.class, is);
+          closeInputStream(is, key);
           nameDetector.put(key, new NameFinderME(nameModel));
         }
+    }
+
+    private void lemmatizer(Properties properties) throws FileNotFoundException {
+        InputStream is = getInputStream(properties, PROPERTY_PATH_LEMMATIZER_MODEL, PROPERTY_DEFAULT_LEMMATIZER_MODEL);
+        //LemmatizerModel lemmaModel = loadModel(LemmatizerModel.class, is);
+        lemmaDetector = new DictionaryLemmatizer(is); // needs OpenNLP >=1.7
+        //lemmaDetector = new SimpleLemmatizer(is); // for OpenNLP < 1.7
+        closeInputStream(is, PROPERTY_PATH_LEMMATIZER_MODEL);
+        //lemmaDetector = new LemmatizerME(lemmaModel);
     }
 
     public void annotate(OpenNLPAnnotation document) {
@@ -154,6 +177,20 @@ public class OpenNLPPipeline {
                 String[] posTags = posme.tag(sentence.getWords());
                 sentence.setPosTags(posTags);
 
+                // Lemmatizer: for each token/word get its lemma
+                //   Version a: for OpenNLP >= 1.7
+                String[] finLemmas = lemmaDetector.lemmatize(sentence.getWords(), posTags);
+                sentence.setLemmas(finLemmas);
+                //    Version b: for OpenNLP < 1.7
+                /*String[] words = sentence.getWords();
+                for (int i=0; i<posTags.length; i++) {
+                  try {
+                    sentence.setLemma(i, lemmaDetector.lemmatize(words[i], posTags[i]));
+                  } catch (ArrayIndexOutOfBoundsException ex) {
+                    LOG.error("Index %d not in array of words.", i);
+                  }
+                }*/
+
                 // Chunking
                 Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
                 sentence.setChunks(chunks);
@@ -167,7 +204,9 @@ public class OpenNLPPipeline {
                 // Named Entities identification
                 for (String key : PROPERTY_NE_MODELS.keySet()) {
                   Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
-                        .forEach(span -> sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType()));
+                        .forEach(span -> {
+                            sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
+                        });
                 }
             });
         } catch (Exception ex) {
@@ -203,6 +242,15 @@ public class OpenNLPPipeline {
             throw new RuntimeException("Error while loading model from path: " + path, ex);
         }
         return is;
+    }
+
+    private void closeInputStream(InputStream is, String type) {
+        try {
+          is.close();
+        } catch (IOException ex) {
+          LOG.warn("Attept to close stream for " + type + " model failed.");
+        }
+        return;
     }
 
 }
