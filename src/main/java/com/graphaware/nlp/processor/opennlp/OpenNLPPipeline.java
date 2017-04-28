@@ -16,6 +16,9 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import opennlp.tools.chunker.ChunkerME;
 import opennlp.tools.chunker.ChunkerModel;
 import opennlp.tools.postag.POSModel;
@@ -62,6 +65,9 @@ public class OpenNLPPipeline {
     // Named Entities: objects
     public HashMap<String, NameFinderME> nameDetector = new HashMap<String, NameFinderME>();
 
+    public final List<String> annotators;
+    public final List<String> stopWords;
+
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
     private TokenizerME wordBreaker;
@@ -94,6 +100,9 @@ public class OpenNLPPipeline {
         PROPERTY_NE_IDS.put("percentagefinder", "percentage");*/
 
         nameDetector = new HashMap<String, NameFinderME>();
+
+        annotators = Arrays.asList(properties.getProperty("annotators", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
+        stopWords  = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
 
         init(properties);
     }
@@ -167,46 +176,80 @@ public class OpenNLPPipeline {
             document.setSentences(sentences);
 
             document.getSentences().stream().forEach((sentence) -> {
-                // Tokenization
-                //String[] words = wordBreaker.tokenize(sentence.getSentence());
-                //sentence.setWords(words); // replaced by calling 'setWordsAndSpans()'
-                Span[] word_spans = wordBreaker.tokenizePos(sentence.getSentence());
-                sentence.setWordsAndSpans(word_spans);
+                if (annotators.contains("tokenize")) {
+                  // Tokenization
+                  Span[] word_spans = wordBreaker.tokenizePos(sentence.getSentence());
 
-                // Part of Speach
-                String[] posTags = posme.tag(sentence.getWords());
-                sentence.setPosTags(posTags);
-
-                // Lemmatizer: for each token/word get its lemma
-                //   Version a: for OpenNLP >= 1.7
-                String[] finLemmas = lemmaDetector.lemmatize(sentence.getWords(), posTags);
-                sentence.setLemmas(finLemmas);
-                //    Version b: for OpenNLP < 1.7
-                /*String[] words = sentence.getWords();
-                for (int i=0; i<posTags.length; i++) {
-                  try {
-                    sentence.setLemma(i, lemmaDetector.lemmatize(words[i], posTags[i]));
-                  } catch (ArrayIndexOutOfBoundsException ex) {
-                    LOG.error("Index %d not in array of words.", i);
+                  if (!annotators.contains("stopword"))
+                    sentence.setWordsAndSpans(word_spans);
+                  else {
+                    String[] words = Span.spansToStrings(word_spans, sentence.getSentence());
+                    ArrayList<Span> fin_spans = new ArrayList<Span>();
+                    for (int i=0; i<words.length; i++) {
+                      if (stopWords.contains(words[i]))
+                        continue;
+                      fin_spans.add(word_spans[i]);
+                    }
+                    sentence.setWordsAndSpans(fin_spans.toArray(new Span[0]));
                   }
-                }*/
 
-                // Chunking
-                Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
-                sentence.setChunks(chunks);
-                String[] chunkStrings = Span.spansToStrings(chunks, sentence.getWords());
-                sentence.setChunkStrings(chunkStrings);
-                for (int i = 0; i < chunks.length; i++) {
-                    //if (chunks[i].getType().equals("NP"))
-                        sentence.addPhraseIndex(i);
-                }
+                  if (annotators.contains("pos")) {
+                    // Part of Speach
+                    String[] posTags = posme.tag(sentence.getWords());
+                    sentence.setPosTags(posTags);
 
-                // Named Entities identification
-                for (String key : PROPERTY_NE_MODELS.keySet()) {
-                  Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
-                        .forEach(span -> {
-                            sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
-                        });
+                    if (annotators.contains("lemma")) {
+                      // Lemmatizer: for each token/word get its lemma
+                      //   Version a: for OpenNLP >= 1.7
+                      String[] finLemmas = lemmaDetector.lemmatize(sentence.getWords(), posTags);
+                      sentence.setLemmas(finLemmas);
+                      //    Version b: for OpenNLP < 1.7
+                      /*String[] words = sentence.getWords();
+                      for (int i=0; i<posTags.length; i++) {
+                        try {
+                          sentence.setLemma(i, lemmaDetector.lemmatize(words[i], posTags[i]));
+                        } catch (ArrayIndexOutOfBoundsException ex) {
+                          LOG.error("Index %d not in array of words.", i);
+                        }
+                      }*/
+                    } // lemma
+                    else
+                      sentence.setDefaultLemmas();
+
+                    if (annotators.contains("chunk")) {
+                      // Chunking
+                      Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
+                      sentence.setChunks(chunks);
+                      String[] chunkStrings = Span.spansToStrings(chunks, sentence.getWords());
+                      sentence.setChunkStrings(chunkStrings);
+                      for (int i = 0; i < chunks.length; i++) {
+                          //if (chunks[i].getType().equals("NP"))
+                              sentence.addPhraseIndex(i);
+                      }
+                    } // chunk
+                    else
+                      sentence.setDefaultChunks();
+                  } // pos
+                  else {
+                    sentence.setDefaultPosTags();
+                    sentence.setDefaultLemmas();
+                    sentence.setDefaultChunks();
+                  }
+
+                  if (annotators.contains("ner")) {
+                    // Named Entities identification
+                    for (String key : PROPERTY_NE_MODELS.keySet()) {
+                      Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
+                            .forEach(span -> {
+                                sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
+                            });
+                    }
+                  } // ner
+                  else
+                    sentence.setDefaultNamedEntities();
+                } // tokenize
+                else {
+                  LOG.error("Annotator misconfiguration.");
                 }
             });
         } catch (Exception ex) {

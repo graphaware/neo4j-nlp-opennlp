@@ -53,6 +53,7 @@ public class OpenNLPAnnotation {
         private Span[] chunks;
         private String[] chunkStrings;
         private String[] namedEntities;
+        private String defaultStringValue = "-";
 
         public Sentence(Span sentence, String text) {
             this.sentence = sentence;
@@ -60,10 +61,10 @@ public class OpenNLPAnnotation {
         }
         
         public void addPhraseIndex(int phraseINdex) {
-            if (nounphrases == null) {
-                nounphrases = new ArrayList<>();
+            if (this.nounphrases == null) {
+                this.nounphrases = new ArrayList<>();
             }
-            nounphrases.add(phraseINdex);
+            this.nounphrases.add(phraseINdex);
         }
 
         public Span getSentenceSpan() {
@@ -84,6 +85,10 @@ public class OpenNLPAnnotation {
 
         public Span[] getWordSpans() {
             return this.wordSpans;
+        }
+
+        public void setWordSpans(Span[] spans) {
+          this.wordSpans = spans;
         }
 
         public void setWordsAndSpans(Span[] spans) {
@@ -121,6 +126,11 @@ public class OpenNLPAnnotation {
             this.posTags = posTags;
         }
 
+        public void setDefaultPosTags() {
+          this.posTags = new String[this.words.length];
+          Arrays.fill(this.posTags, defaultStringValue);
+        }
+
         public Span[] getChunks() {
             return chunks;
         }
@@ -137,7 +147,17 @@ public class OpenNLPAnnotation {
             this.chunkStrings = chunkStrings;
         }
 
+        public void setDefaultChunks() {
+          this.chunks = new Span[this.words.length];
+          Arrays.fill(this.chunks, new Span(0, 0));
+          this.chunkStrings = new String[this.words.length];
+          Arrays.fill(this.chunkStrings, defaultStringValue);
+          this.nounphrases = new ArrayList<>();
+        }
+
         public List<Integer> getPhrasesIndex() {
+            //if (nounphrases==null)
+              //return new ArrayList<Integer>();
             return nounphrases;
         }
 
@@ -155,6 +175,11 @@ public class OpenNLPAnnotation {
               this.namedEntities[i] = type;
         }
 
+        public void setDefaultNamedEntities() {
+          this.namedEntities = new String[this.words.length];
+          Arrays.fill(this.namedEntities, defaultStringValue);
+        }
+
         public String[] getLemmas() {
           return this.lemmas;
         }
@@ -165,6 +190,11 @@ public class OpenNLPAnnotation {
           if (this.words.length!=lemmas.length) // ... something is wrong
             return;
           this.lemmas = lemmas;
+        }
+
+        public void setDefaultLemmas() {
+          this.lemmas = new String[this.words.length];
+          Arrays.fill(this.lemmas, "O");
         }
 
         public void setLemma(int idx, String lemma) {

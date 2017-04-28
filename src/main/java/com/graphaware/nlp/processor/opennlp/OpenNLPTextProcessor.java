@@ -62,7 +62,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
     private void createTokenizerPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
-                //.defaultStopWordAnnotator()
+                .defaultStopWordAnnotator()
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER, pipeline);
@@ -70,8 +70,9 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private void createPosPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
-                //.tokenize()
-                //.defaultStopWordAnnotator()
+                .tokenize()
+                .defaultStopWordAnnotator()
+                .extractPos()
                 .threadNumber(6)
                 .build();
         pipelines.put(POS, pipeline);
@@ -80,9 +81,10 @@ public class OpenNLPTextProcessor implements TextProcessor {
     private void createPhrasePipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
-                //.defaultStopWordAnnotator()
-                .extractSentiment()
-                .extractCoref()
+                .defaultStopWordAnnotator()
+                //.extractSentiment()
+                //.extractCoref()
+                .extractPos()
                 .extractRelations()
                 .threadNumber(6)
                 .build();
@@ -161,56 +163,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
           Tag newTag = getTag(sentence, idx, lang);
           newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
         }
-
-        /*TokenHolder currToken = new TokenHolder();
-        currToken.setNe(backgroundSymbol);
-        Arrays.asList(tokens).stream()
-                .filter(token -> token!=null) // && checkPuntuation(token.get(CoreAnnotations.LemmaAnnotation.class)))
-                .map(token -> {
-                    String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
-                    if (currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-                        Tag tag = getTag(token, lang);
-                        if (tag != null) {
-                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-                        }
-                    } else if (currentNe.equals(backgroundSymbol) && !currToken.getNe().equals(backgroundSymbol)) {
-                        Tag newTag = new Tag(currToken.getToken(), lang);
-                        newTag.setNe(currToken.getNe());
-                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(newTag));
-                        currToken.reset();
-                        Tag tag = getTag(token, lang);
-                        if (tag != null) {
-                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-                        }
-                    } else if (!currentNe.equals(currToken.getNe()) && !currToken.getNe().equals(backgroundSymbol)) {
-                        Tag tag = new Tag(currToken.getToken(), lang);
-                        tag.setNe(currToken.getNe());
-                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-                        currToken.reset();
-                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-                        currToken.setBeginPosition(token.beginPosition());
-                        currToken.setEndPosition(token.endPosition());
-                    } else if (!currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-                        currToken.setBeginPosition(token.beginPosition());
-                        currToken.setEndPosition(token.endPosition());
-                    } else {
-                        String before = StringUtils.getNotNullString(token.get(CoreAnnotations.BeforeAnnotation.class));
-                        String currentText = StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class));
-                        currToken.updateToken(before);
-                        currToken.updateToken(currentText);
-                        currToken.setBeginPosition(token.beginPosition());
-                        currToken.setEndPosition(token.endPosition());
-                    }
-                    return currentNe;
-                });
-                .forEach(currentNe -> currToken.setNe(currentNe));
-
-        if (currToken.getToken().length() > 0) {
-            Tag tag = new Tag(currToken.getToken(), lang);
-            tag.setNe(currToken.getNe());
-            newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-        }*/
     }
 
 //    private void extractRelationship(AnnotatedText annotatedText, List<CoreMap> sentences, Annotation document) {
@@ -316,7 +268,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
       if (sentence.getPosTags()!=null) {
         try {
           if (sentence.getPosTags()[tokenIdx]!=null)
-            pos = sentence.getPosTags()[tokenIdx]; // TO DO: try ... catch
+            pos = sentence.getPosTags()[tokenIdx];
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of POS tags.", tokenIdx);
         }
@@ -325,7 +277,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
       if (sentence.getNamedEntities()!=null) {
         try {
           if (sentence.getNamedEntities()[tokenIdx]!=null)
-            ne = sentence.getNamedEntities()[tokenIdx]; // TO DO: try ... catch
+            ne = sentence.getNamedEntities()[tokenIdx];
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of named entities.", tokenIdx);
         }

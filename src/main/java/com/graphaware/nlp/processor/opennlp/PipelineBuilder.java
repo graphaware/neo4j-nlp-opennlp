@@ -22,13 +22,15 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder tokenize() {
-        //checkForExistingAnnotators();
-        //annotators.append("tokenize, ssplit, pos, lemma, ner");
+        checkForExistingAnnotators();
+        annotators.append("tokenize, lemma, ner");
         return this;
     }
 
-    public PipelineBuilder lemmatize() {
-      return this;
+    public PipelineBuilder extractPos() {
+        checkForExistingAnnotators();
+        annotators.append("pos");
+        return this;
     }
 
     public PipelineBuilder extractSentiment() {
@@ -36,6 +38,8 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder extractRelations() {
+        checkForExistingAnnotators();
+        annotators.append("relation");
         return this;
     }
 
@@ -44,14 +48,23 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder defaultStopWordAnnotator() {
-        /*checkForExistingAnnotators();
+        checkForExistingAnnotators();
         annotators.append("stopword");
-        properties.setProperty("customAnnotatorClass.stopword", StopwordAnnotator.class.getName());
-        properties.setProperty(StopwordAnnotator.STOPWORDS_LIST, CUSTOM_STOP_WORD_LIST);*/
+        properties.setProperty("stopword", CUSTOM_STOP_WORD_LIST);
         return this;
     }
 
     public PipelineBuilder customStopWordAnnotator(String customStopWordList) {
+        checkForExistingAnnotators();
+        String stopWordList;
+        if (annotators.indexOf("stopword") >= 0) {
+            String alreadyexistingStopWordList = properties.getProperty("stopword");
+            stopWordList = alreadyexistingStopWordList + "," + customStopWordList;
+        } else {
+            annotators.append("stopword");
+            stopWordList = customStopWordList;
+        }
+        properties.setProperty("stopword", stopWordList);
         return this;
     }
 
@@ -65,6 +78,8 @@ class PipelineBuilder {
     }
 
     public OpenNLPPipeline build() {
+        properties.setProperty("annotators", annotators.toString());
+        properties.setProperty("threads", String.valueOf(threadsNumber));
         OpenNLPPipeline pipeline = new OpenNLPPipeline(properties);
         return pipeline;
     }
