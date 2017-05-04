@@ -34,6 +34,8 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder extractSentiment() {
+        checkForExistingAnnotators();
+        annotators.append("sentiment");
         return this;
     }
 

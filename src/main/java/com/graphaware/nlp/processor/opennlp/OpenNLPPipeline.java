@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -33,8 +34,18 @@ import opennlp.tools.lemmatizer.LemmatizerModel;      // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.LemmatizerME;         // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.DictionaryLemmatizer; // needs OpenNLP >=1.7
 //import opennlp.tools.lemmatizer.SimpleLemmatizer;   // for OpenNLP < 1.7
+import opennlp.tools.doccat.DoccatModel;
+import opennlp.tools.doccat.DoccatFactory;
+import opennlp.tools.doccat.DocumentCategorizerME;
+import opennlp.tools.doccat.DocumentSampleStream;
+import opennlp.tools.doccat.DocumentSample;
 import opennlp.tools.util.Span;
 import opennlp.tools.util.model.BaseModel;
+import opennlp.tools.util.ObjectStream;
+import opennlp.tools.util.PlainTextByLineStream;
+import opennlp.tools.util.InputStreamFactory;
+import opennlp.tools.util.TrainingParameters;
+import opennlp.tools.util.MarkableFileInputStreamFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +60,14 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_PATH_SENTENCE_MODEL = "sentence";
     public static final String PROPERTY_PATH_TOKENIZER_MODEL = "tokenizer";
     public static final String PROPERTY_PATH_LEMMATIZER_MODEL = "lemmatizer";
+    public static final String PROPERTY_PATH_SENTIMENT_MODEL = "sentiment";
 
     public static final String PROPERTY_DEFAULT_CHUNKER_MODEL = "en-chunker.bin";
     public static final String PROPERTY_DEFAULT_POS_TAGGER_MODEL = "en-pos-maxent.bin";
     public static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
     public static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
     public static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
+    public static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "";
 
     // Named Entities: mapping from labels to models
     public static HashMap<String, String> PROPERTY_NE_MODELS = new HashMap<>();
@@ -77,6 +90,7 @@ public class OpenNLPPipeline {
     //private LemmatizerME lemmaDetector;
     private DictionaryLemmatizer lemmaDetector; // needs OpenNLP >=1.7
     //private SimpleLemmatizer lemmaDetector; // for OpenNLP < 1.7
+    private DocumentCategorizerME sentimentDetector;
 
     public OpenNLPPipeline(Properties properties) {
         // Named Entities: mapping from labels to models
@@ -115,6 +129,7 @@ public class OpenNLPPipeline {
             chuncker(properties);
             namedEntitiesFinders(properties);
             lemmatizer(properties);
+            categorizer(properties);
 
         } catch (IOException e) {
             LOG.error("Could not initialize OpenNLP models: " + e.getMessage());
@@ -168,6 +183,35 @@ public class OpenNLPPipeline {
         //lemmaDetector = new LemmatizerME(lemmaModel);
     }
 
+    private void categorizer(Properties properties) throws FileNotFoundException {
+        /*InputStream is = getInputStream(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_MODEL);
+        DoccatModel doccatModel = loadModel(DoccatModel.class, is);
+        closeInputStream(is, PROPERTY_PATH_SENTIMENT_MODEL);
+        sentimentDetector = new DocumentCategorizerME(doccatModel);*/
+
+        // First: train a model
+        DoccatModel model = null;
+        ImprovisedInputStreamFactory dataIn = null;
+        try {
+          dataIn = new ImprovisedInputStreamFactory(properties, PROPERTY_PATH_SENTIMENT_MODEL, "sentiment_tweets.train");
+          ObjectStream<String> lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
+          ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream);
+          TrainingParameters params = new TrainingParameters();
+          params.put(TrainingParameters.CUTOFF_PARAM, "2");
+          params.put(TrainingParameters.ITERATIONS_PARAM, "30");
+          model = DocumentCategorizerME.train("en", sampleStream, params, new DoccatFactory());
+          //model = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
+        } catch (IOException e) {
+          e.printStackTrace();
+        } finally {
+          if (dataIn!=null)
+            dataIn.closeInputStream();
+        }
+
+        if (model!=null)
+          sentimentDetector = new DocumentCategorizerME(model);
+    }
+
     public void annotate(OpenNLPAnnotation document) {
 
         String text = document.getText();
@@ -175,7 +219,7 @@ public class OpenNLPPipeline {
             Span sentences[] = sentenceDetector.sentPosDetect(text);
             document.setSentences(sentences);
 
-            document.getSentences().stream().forEach((sentence) -> {
+            document.getSentences().stream().forEach(sentence -> {
                 if (annotators.contains("tokenize")) {
                   // Tokenization
                   Span[] word_spans = wordBreaker.tokenizePos(sentence.getSentence());
@@ -216,16 +260,28 @@ public class OpenNLPPipeline {
                     else
                       sentence.setDefaultLemmas();
 
-                    if (annotators.contains("chunk")) {
+                    if (annotators.contains("relation")) {
                       // Chunking
                       Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
                       sentence.setChunks(chunks);
                       String[] chunkStrings = Span.spansToStrings(chunks, sentence.getWords());
                       sentence.setChunkStrings(chunkStrings);
+                      List<String> chunkSentiments = new ArrayList<String>();
                       for (int i = 0; i < chunks.length; i++) {
-                          //if (chunks[i].getType().equals("NP"))
-                              sentence.addPhraseIndex(i);
+                        //if (chunks[i].getType().equals("NP"))
+                            sentence.addPhraseIndex(i);
+                        // run sentiment analysis on chunks? (would be needed to ensure only chunks with >=2 words are used)
+                        /*if (annotators.contains("sentiment")) {
+                          double[] outcomes = sentimentDetector.categorize(chunkStrings[i]);
+                          String category = sentimentDetector.getBestCategory(outcomes);
+                          if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
+                            category = "2"; // not conclusive, setting it to "Neutral"
+                          chunkSentiments.add(category);
+                          LOG.info("Sentence: " + chunkStrings[i] + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
+                        }*/
                       }
+                      if (chunkSentiments!=null)
+                        sentence.setChunkSentiments(chunkSentiments.toArray(new String[chunkSentiments.size()]));
                     } // chunk
                     else
                       sentence.setDefaultChunks();
@@ -248,8 +304,14 @@ public class OpenNLPPipeline {
                   else
                     sentence.setDefaultNamedEntities();
                 } // tokenize
-                else {
-                  LOG.error("Annotator misconfiguration.");
+
+                if (annotators.contains("sentiment")) {
+                  double[] outcomes = sentimentDetector.categorize(sentence.getSentence());
+                  String category = sentimentDetector.getBestCategory(outcomes);
+                  if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
+                    category = "2"; // not conclusive, setting it to "Neutral"
+                  sentence.setSentiment(category);
+                  LOG.info("Sentence: " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
                 }
             });
         } catch (Exception ex) {
@@ -294,6 +356,39 @@ public class OpenNLPPipeline {
           LOG.warn("Attept to close stream for " + type + " model failed.");
         }
         return;
+    }
+
+
+    class ImprovisedInputStreamFactory implements InputStreamFactory {
+      //private final String fileName;
+      private final Properties properties;
+      private final String property;
+      private final String defaultProperty;
+      private InputStream is;
+
+      ImprovisedInputStreamFactory(Properties properties, String property, String defaultValue) {
+        //this.fileName = name;
+        this.properties = properties;
+        this.property = property;
+        this.defaultProperty = defaultValue;
+
+        this.is = getInputStream(this.properties, this.property, this.defaultProperty);
+      }
+
+      @Override
+      public InputStream createInputStream() throws IOException {
+        //return getInputStream(this.properties, this.property, this.defaultProperty);
+        return this.is;
+      }
+
+      public void closeInputStream() {
+        try {
+          if (this.is!=null)
+            this.is.close();
+        } catch (IOException ex) {
+          LOG.warn("Attept to close input stream failed.");
+        }
+      }
     }
 
 }

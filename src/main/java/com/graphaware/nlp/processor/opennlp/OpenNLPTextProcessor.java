@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.Optional;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +53,8 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public OpenNLPTextProcessor() {
         //Creating default pipelines
         createTokenizerPipeline();
+        createSentimentPipeline();
+        createTokenizerAndSentimentPipeline();
         createPosPipeline();
         createPhrasePipeline();
 
@@ -68,11 +71,31 @@ public class OpenNLPTextProcessor implements TextProcessor {
         pipelines.put(TOKENIZER, pipeline);
     }
 
+    private void createSentimentPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                .extractSentiment()
+                .threadNumber(6)
+                .build();
+        pipelines.put(SENTIMENT, pipeline);
+    }
+
+    private void createTokenizerAndSentimentPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                .defaultStopWordAnnotator()
+                .extractSentiment()
+                .threadNumber(6)
+                .build();
+        pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
+    }
+
     private void createPosPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .defaultStopWordAnnotator()
                 .extractPos()
+                .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(POS, pipeline);
@@ -82,10 +105,10 @@ public class OpenNLPTextProcessor implements TextProcessor {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .defaultStopWordAnnotator()
-                //.extractSentiment()
                 //.extractCoref()
                 .extractPos()
                 .extractRelations()
+                .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(PHRASE, pipeline);
@@ -121,14 +144,14 @@ public class OpenNLPTextProcessor implements TextProcessor {
         pipeline.annotate(document);
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         final AtomicInteger sentenceSequence = new AtomicInteger(0);
-        sentences.stream().map((sentence) -> {
+        sentences.stream()/*.map((sentence) -> {
             return sentence;
-        }).forEach((sentence) -> {
+        })*/.forEach((sentence) -> {
             int sentenceNumber = sentenceSequence.getAndIncrement();
             String sentenceId = id + "_" + sentenceNumber;
-            final Sentence newSentence = new Sentence(sentence.toString(), store, sentenceId, sentenceNumber);
+            final Sentence newSentence = new Sentence(sentence.getSentence(), store, sentenceId, sentenceNumber);
             extractTokens(lang, sentence, newSentence);
-            //extractSentiment(sentence, newSentence);
+            extractSentiment(sentence, newSentence);
             extractPhrases(sentence, newSentence);
             result.addSentence(newSentence);
         });
@@ -144,13 +167,14 @@ public class OpenNLPTextProcessor implements TextProcessor {
         });
     }
 
-//    protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-//        int score = extractSentiment(sentence);
-//        newSentence.setSentiment(score);
-//    }
+    protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
+        int score = -1;
+        if (sentence.getSentiment()!=null)
+          score = Integer.valueOf(sentence.getSentiment());
+        newSentence.setSentiment(score);
+    }
 
     protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-        // TO DO: lemma, named entities
         String[] tokens = sentence.getWords();
         String text = sentence.getSentence();
         //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
@@ -198,30 +222,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //                }
 //            }
 //        }
-//    }
-
-//    public AnnotatedText sentiment(AnnotatedText annotated) {
-//        StanfordCoreNLP pipeline = pipelines.get(SENTIMENT);
-//        annotated.getSentences().parallelStream().forEach((item) -> {
-//            Annotation document = new Annotation(item.getSentence());
-//            pipeline.annotate(document);
-//            List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-//            Optional<CoreMap> sentence = sentences.stream().findFirst();
-//            if (sentence != null && sentence.isPresent()) {
-//                extractSentiment(sentence.get(), item);
-//            }
-//        });
-//        return annotated;
-//    }
-//
-//    private int extractSentiment(CoreMap sentence) {
-//        Tree tree = sentence
-//                .get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
-//        if (tree == null) {
-//            return Sentence.NO_SENTIMENT;
-//        }
-//        int score = RNNCoreAnnotations.getPredictedClass(tree);
-//        return score;
 //    }
 
     @Override
@@ -324,7 +324,22 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public AnnotatedText sentiment(AnnotatedText annotated) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        // TO DO: change main method in neo4j-nlp (currently it doesn't support user-defined text processor, but uses default one only)
+        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
+        if (pipeline==null) {
+          throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
+        }
+        annotated.getSentences().parallelStream().forEach(item -> {
+            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
+            pipeline.annotate(document);
+            List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+            Optional<OpenNLPAnnotation.Sentence> sentence = sentences.stream().findFirst();
+            if (sentence!=null && sentence.isPresent()) {
+              extractSentiment(sentence.get(), item);
+            }
+        });
+        return annotated;
     }
 
 

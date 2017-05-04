@@ -45,6 +45,7 @@ public class OpenNLPAnnotation {
 
         private final Span sentence;
         private final String sentenceText;
+        private String sentenceSentiment;
         private List<Integer> nounphrases;
         private String[] words;
         private Span[] wordSpans;
@@ -52,12 +53,14 @@ public class OpenNLPAnnotation {
         private String[] lemmas;
         private Span[] chunks;
         private String[] chunkStrings;
+        private String[] chunkSentiments;
         private String[] namedEntities;
-        private String defaultStringValue = "-";
+        private final String defaultStringValue = "-";
 
         public Sentence(Span sentence, String text) {
             this.sentence = sentence;
             this.sentenceText = String.valueOf(sentence.getCoveredText(text));
+            this.sentenceSentiment = defaultStringValue;
         }
         
         public void addPhraseIndex(int phraseINdex) {
@@ -68,11 +71,19 @@ public class OpenNLPAnnotation {
         }
 
         public Span getSentenceSpan() {
-            return sentence;
+            return this.sentence;
         }
         
         public String getSentence() {
-            return sentenceText;
+            return this.sentenceText;
+        }
+
+        public String getSentiment() {
+          return this.sentenceSentiment;
+        }
+
+        public void setSentiment(String sent) {
+          this.sentenceSentiment = sent;
         }
         
         public String[] getWords() {
@@ -100,7 +111,8 @@ public class OpenNLPAnnotation {
           this.wordSpans = spans;
           this.words = new String[this.wordSpans.length];
           this.words = Arrays.asList(spans).stream()
-                        .map(span -> new String(this.sentenceText.substring(span.getStart(), span.getEnd())))
+                        //.map(span -> new String(this.sentenceText.substring(span.getStart(), span.getEnd())))
+                        .map(span -> String.valueOf(span.getCoveredText(this.sentenceText)))
                         .collect(Collectors.toList()).toArray(this.words);
         }
 
@@ -119,7 +131,7 @@ public class OpenNLPAnnotation {
         }
 
         public String[] getPosTags() {
-            return posTags;
+            return this.posTags;
         }
 
         public void setPosTags(String[] posTags) {
@@ -132,7 +144,7 @@ public class OpenNLPAnnotation {
         }
 
         public Span[] getChunks() {
-            return chunks;
+            return this.chunks;
         }
 
         public void setChunks(Span[] chunks) {
@@ -140,11 +152,21 @@ public class OpenNLPAnnotation {
         }
 
         public String[] getChunkStrings() {
-            return chunkStrings;
+            return this.chunkStrings;
         }
 
         public void setChunkStrings(String[] chunkStrings) {
             this.chunkStrings = chunkStrings;
+        }
+
+        public String[] getChunkSentiments() {
+          return this.chunkSentiments;
+        }
+
+        public void setChunkSentiments(String[] sents) {
+          if (sents==null) return;
+          if (sents.length!=this.chunks.length) return;
+          this.chunkSentiments = sents;
         }
 
         public void setDefaultChunks() {
