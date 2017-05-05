@@ -169,8 +169,13 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
         int score = -1;
-        if (sentence.getSentiment()!=null)
-          score = Integer.valueOf(sentence.getSentiment());
+        if (sentence.getSentiment()!=null && sentence.getSentiment()!="-") {
+          try {
+            score = Integer.valueOf(sentence.getSentiment());
+          } catch (NumberFormatException ex) {
+            LOG.error("NumberFormatException: error extracting sentiment as a number.");
+          }
+        }
         newSentence.setSentiment(score);
     }
 
