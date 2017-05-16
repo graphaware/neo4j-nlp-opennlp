@@ -69,6 +69,8 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
     public static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "";
 
+    public static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";    
+
     // Named Entities: mapping from labels to models
     public static HashMap<String, String> PROPERTY_NE_MODELS = new HashMap<>();
 
@@ -193,7 +195,7 @@ public class OpenNLPPipeline {
         DoccatModel model = null;
         ImprovisedInputStreamFactory dataIn = null;
         try {
-          dataIn = new ImprovisedInputStreamFactory(properties, PROPERTY_PATH_SENTIMENT_MODEL, "sentiment_tweets.train");
+          dataIn = new ImprovisedInputStreamFactory(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_TRAIN);
           ObjectStream<String> lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
           ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream);
           TrainingParameters params = new TrainingParameters();
@@ -229,12 +231,15 @@ public class OpenNLPPipeline {
                   else {
                     String[] words = Span.spansToStrings(word_spans, sentence.getSentence());
                     ArrayList<Span> fin_spans = new ArrayList<Span>();
+                    ArrayList<String> fin_words = new ArrayList<String>();
                     for (int i=0; i<words.length; i++) {
                       if (stopWords.contains(words[i]))
                         continue;
+                      fin_words.add(words[i]);
                       fin_spans.add(word_spans[i]);
                     }
-                    sentence.setWordsAndSpans(fin_spans.toArray(new Span[0]));
+                    sentence.setWords(fin_words.toArray(new String[fin_words.size()]));
+                    sentence.setWordSpans(fin_spans.toArray(new Span[fin_spans.size()]));
                   }
 
                   if (annotators.contains("pos")) {

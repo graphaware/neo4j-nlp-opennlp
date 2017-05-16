@@ -40,7 +40,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
     public static final String TOKENIZER = "tokenizer";
-    public static final String POS = "pos";
     public static final String SENTIMENT = "sentiment";
     public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
     public static final String PHRASE = "phrase";
@@ -55,7 +54,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
         createTokenizerPipeline();
         createSentimentPipeline();
         createTokenizerAndSentimentPipeline();
-        createPosPipeline();
         createPhrasePipeline();
 
         String pattern = "\\p{Punct}";
@@ -90,23 +88,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
         pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
     }
 
-    private void createPosPipeline() {
-        OpenNLPPipeline pipeline = new PipelineBuilder()
-                .tokenize()
-                .defaultStopWordAnnotator()
-                .extractPos()
-                .extractSentiment()
-                .threadNumber(6)
-                .build();
-        pipelines.put(POS, pipeline);
-    }
-
     private void createPhrasePipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .defaultStopWordAnnotator()
                 //.extractCoref()
-                .extractPos()
                 .extractRelations()
                 .extractSentiment()
                 .threadNumber(6)
@@ -135,6 +121,10 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store) {
+        if (name=="") {
+          name = TOKENIZER;
+          LOG.debug("Using default pipeline: " + name);
+        }
         OpenNLPPipeline pipeline = pipelines.get(name);
         if (pipeline == null) {
             throw new RuntimeException("Pipeline: " + name + " doesn't exist");
@@ -144,9 +134,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
         pipeline.annotate(document);
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         final AtomicInteger sentenceSequence = new AtomicInteger(0);
-        sentences.stream()/*.map((sentence) -> {
-            return sentence;
-        })*/.forEach((sentence) -> {
+        sentences.stream().forEach((sentence) -> {
             int sentenceNumber = sentenceSequence.getAndIncrement();
             String sentenceId = id + "_" + sentenceNumber;
             final Sentence newSentence = new Sentence(sentence.getSentence(), store, sentenceId, sentenceNumber);
@@ -329,13 +317,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public AnnotatedText sentiment(AnnotatedText annotated) {
-        // TO DO: change main method in neo4j-nlp (currently it doesn't support user-defined text processor, but uses default one only)
-        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
         if (pipeline==null) {
           throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
         }
-        annotated.getSentences().parallelStream().forEach(item -> {
+        annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
             OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
             pipeline.annotate(document);
             List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
