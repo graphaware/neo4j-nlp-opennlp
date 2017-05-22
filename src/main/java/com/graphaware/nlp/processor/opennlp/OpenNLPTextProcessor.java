@@ -44,8 +44,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
     public static final String PHRASE = "phrase";
 
-    public static final String backgroundSymbol = "O,MISC"; // default value (taken from StanfordNLP)
-
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
     private final Pattern patternCheck;
 
@@ -331,6 +329,17 @@ public class OpenNLPTextProcessor implements TextProcessor {
             }
         });
         return annotated;
+    }
+
+    @Override
+    public void train(String project, String alg, String model, String file, String lang) {
+        // training could be done directly here, but it's better to have everything model-implementation related in one class, therefore ...
+        OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
+        if (pipeline==null) {
+          throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
+        }
+        pipeline.train(project, alg, model, file, lang);
+        return;
     }
 
 

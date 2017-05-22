@@ -5,7 +5,7 @@ Getting the Software
 ---------------------
 
 ### Server Mode
-When using Neo4j in the standalone <a href="http://docs.neo4j.org/chunked/stable/server-installation.html" target="_blank">standalone server</a> mode, you will need the <a href="https://github.com/graphaware/neo4j-framework" target="_blank">GraphAware Neo4j Framework</a> and <a href="https://github.com/graphaware/neo4j-nlp" target="_blank">GraphAware NLP</a>.jar files (both of which you can download here) dropped into the plugins directory of your Neo4j installation. Finally, the following needs to be appended to the `neo4j.conf` file in the `config/` directory:
+When using Neo4j in the <a href="http://docs.neo4j.org/chunked/stable/server-installation.html" target="_blank">standalone server</a> mode, you will need the <a href="https://github.com/graphaware/neo4j-framework" target="_blank">GraphAware Neo4j Framework</a> and <a href="https://github.com/graphaware/neo4j-nlp" target="_blank">GraphAware NLP</a> .jar files (both of which you can download here) dropped into the plugins directory of your Neo4j installation. Finally, the following needs to be appended to the `neo4j.conf` file in the `config/` directory:
 
 ```
   dbms.unmanaged_extension_classes=com.graphaware.server=/graphaware
@@ -58,3 +58,12 @@ MATCH (result)-[:CONTAINS_SENTENCE]->(s:Sentence)
 RETURN labels(s) as labels
 ```
 
+### Customizing pipeline models
+For the moment, only Named Entity Recognition (NER) in OpenNLP Text Processor is customizable. To use it, run the following:
+```
+CALL ga.nlp.train({[project: "XY",] alg: "NER", model: "component", file: "<path_to_your_training_file>"})
+```
+  * `project` allows to specify in the `annotate()` procedure that the default + this custom NER model should be used
+  * `alg` specifies which algorithm is about to be trained (right now, only NER is available)
+  * `model` in combination with `alg` (and with `project` if it's specified) provides a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
+  * `file` is path to your training data

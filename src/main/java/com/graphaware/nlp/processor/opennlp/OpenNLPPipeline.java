@@ -7,10 +7,12 @@ package com.graphaware.nlp.processor.opennlp;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.FileOutputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -29,7 +31,10 @@ import opennlp.tools.sentdetect.SentenceModel;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.namefind.TokenNameFinderModel;
+import opennlp.tools.namefind.TokenNameFinderFactory;
 import opennlp.tools.namefind.NameFinderME;
+import opennlp.tools.namefind.NameSampleDataStream;
+import opennlp.tools.namefind.NameSample;
 import opennlp.tools.lemmatizer.LemmatizerModel;      // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.LemmatizerME;         // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.DictionaryLemmatizer; // needs OpenNLP >=1.7
@@ -46,6 +51,8 @@ import opennlp.tools.util.PlainTextByLineStream;
 import opennlp.tools.util.InputStreamFactory;
 import opennlp.tools.util.TrainingParameters;
 import opennlp.tools.util.MarkableFileInputStreamFactory;
+import opennlp.tools.util.model.BaseModel;
+import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +79,7 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";    
 
     // Named Entities: mapping from labels to models
-    public static HashMap<String, String> PROPERTY_NE_MODELS = new HashMap<>();
+    public static HashMap<String, String> PROPERTY_NE_MODELS;
 
     // Named Entities: mapping from labels to identifiers that are used in the graph
     //public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
@@ -98,22 +105,12 @@ public class OpenNLPPipeline {
         // Named Entities: mapping from labels to models
         PROPERTY_NE_MODELS = new HashMap<String, String>();
         PROPERTY_NE_MODELS.put("namefinder", "en-ner-person.bin");
-        PROPERTY_NE_MODELS.put("datefinder", "en-ner-date.bin");
+        /*PROPERTY_NE_MODELS.put("datefinder", "en-ner-date.bin");
         PROPERTY_NE_MODELS.put("locationfinder", "en-ner-location.bin");
         PROPERTY_NE_MODELS.put("timefinder", "en-ner-time.bin");
         PROPERTY_NE_MODELS.put("organizationfinder", "en-ner-organization.bin");
         PROPERTY_NE_MODELS.put("moneyfinder", "en-ner-money.bin");
-        PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");
-
-        // Named Entities: mapping from labels to identifiers that are used in the graph
-        /*PROPERTY_NE_IDS = new HashMap<String, String>();
-        PROPERTY_NE_IDS.put("namefinder", "person");
-        PROPERTY_NE_IDS.put("datefinder", "date");
-        PROPERTY_NE_IDS.put("locationfinder", "location");
-        PROPERTY_NE_IDS.put("timefinder", "time");
-        PROPERTY_NE_IDS.put("organizationfinder", "organization");
-        PROPERTY_NE_IDS.put("moneyfinder", "money");
-        PROPERTY_NE_IDS.put("percentagefinder", "percentage");*/
+        PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");*/
 
         nameDetector = new HashMap<String, NameFinderME>();
 
@@ -303,6 +300,7 @@ public class OpenNLPPipeline {
                       Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
                             .forEach(span -> {
                                 sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
+                                LOG.info(span.getType());
                             });
                     }
                   } // ner
@@ -325,6 +323,52 @@ public class OpenNLPPipeline {
         }
     }
 
+    public void train(String project, String alg, String model_str, String file, String lang) {
+      String fileOut = createModelFileName(lang, alg, model_str, project);
+      //LOG.info(project + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + file);
+
+      if (alg.toLowerCase().equals("ner")) {
+        // open file
+        ImprovisedInputStreamFactory dataIn = null;
+        ObjectStream<NameSample> sampleStream = null;
+        try {
+          dataIn = new ImprovisedInputStreamFactory(null, "", file);
+          ObjectStream<String> lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
+          sampleStream = new NameSampleDataStream(lineStream);
+          //lineStream.close();
+        } catch (IOException ex) {
+          LOG.error("Failure while opening file " + file, ex);
+          throw new RuntimeException("Failure while opening file " + file, ex);
+        } /*finally {
+          if (dataIn!=null)
+            dataIn.closeInputStream();
+        }*/
+
+        // train model
+        TokenNameFinderModel model;
+        try {
+          model = NameFinderME.train(lang, null, sampleStream, TrainingParameters.defaultParams(), new TokenNameFinderFactory());
+          //saveModel(model, fileOut);
+          sampleStream.close();
+        } catch (Exception ex) {
+          LOG.error("Error while training model " + alg + "/" + model_str, ex);
+          throw new RuntimeException("Error while training model " + alg + "/" + model_str, ex);
+        }
+
+        // incorporate this new model to the OpenNLPPipeline
+        PROPERTY_NE_MODELS.put(project + "_" + model_str, fileOut);
+        if (!nameDetector.containsKey(project + "_" + model_str)) {
+          nameDetector.put(project + "_" + model_str, new NameFinderME(model));
+        }
+      }
+
+      else {
+        throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
+      }
+
+      return;
+    }
+
     private <T extends BaseModel> T loadModel(Class<T> clazz, InputStream in) {
         try {
             Constructor<T> modelConstructor = clazz.getConstructor(InputStream.class);
@@ -336,8 +380,26 @@ public class OpenNLPPipeline {
         }
     }
 
+    private void saveModel(BaseModel model, String file) {
+      if (model==null) {
+        LOG.error("Can't save training results to a " + file + ": model is null");
+        return;
+      }
+      BufferedOutputStream modelOut = null;
+      try {
+        modelOut = new BufferedOutputStream(new FileOutputStream(file));
+        model.serialize(modelOut);
+        modelOut.close();
+      } catch (IOException ex) {
+        LOG.error("Error saving model to file " + file, ex);
+        throw new RuntimeException("Error saving model to file " + file, ex);
+      }
+      return;
+    }
+
     private InputStream getInputStream(Properties properties, String property, String defaultValue) {
-        String path = properties.getProperty(property, defaultValue);
+        String path = defaultValue;
+        if (properties!=null) properties.getProperty(property, defaultValue);
         InputStream is;
         try {
             if (path.startsWith("file://")) {
@@ -361,6 +423,16 @@ public class OpenNLPPipeline {
           LOG.warn("Attept to close stream for " + type + " model failed.");
         }
         return;
+    }
+
+    private String createModelFileName(String lang, String alg, String model, String project) {
+      String delim = "-";
+      String name = lang + delim + alg;
+      if (model!=null) {
+        if (model.length()>0) name += delim + model;
+      }
+      name += delim + project + ".bin"; 
+      return name;
     }
 
 
