@@ -114,22 +114,26 @@ public class OpenNLPTextProcessor implements TextProcessor {
             default:
                 pipeline = TOKENIZER;
         }
-        return annotateText(text, id, pipeline, lang, store);
+        return annotateText(text, id, pipeline, lang, store, "");
     }
 
     @Override
-    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store) {
+    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, String nerProject) {
         if (name=="") {
           name = TOKENIZER;
-          LOG.debug("Using default pipeline: " + name);
+          LOG.info("Using default pipeline: " + name);
         }
         OpenNLPPipeline pipeline = pipelines.get(name);
-        if (pipeline == null) {
-            throw new RuntimeException("Pipeline: " + name + " doesn't exist");
-        }
-        AnnotatedText result = new AnnotatedText(id);
+        if (pipeline==null)
+          throw new RuntimeException("Pipeline: " + name + " doesn't exist");
+
+        pipeline.useThisCustomNER(nerProject);
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipeline.annotate(document);
+        LOG.info("Annotation for id " + id + " finished.");
+        pipeline.useThisCustomNER(null);
+
+        AnnotatedText result = new AnnotatedText(id);
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         final AtomicInteger sentenceSequence = new AtomicInteger(0);
         sentences.stream().forEach((sentence) -> {
@@ -167,7 +171,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
         String[] tokens = sentence.getWords();
-        String text = sentence.getSentence();
+        //String text = sentence.getSentence();
         //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
         int idx = -1;
         for (String token : tokens) {

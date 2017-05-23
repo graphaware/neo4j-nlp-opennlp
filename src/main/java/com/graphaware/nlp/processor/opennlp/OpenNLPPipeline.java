@@ -74,18 +74,24 @@ public class OpenNLPPipeline {
     public static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
     public static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
     public static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
-    public static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "";
+    public static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "en-sentiment-tweets_toy.bin";
 
-    public static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";    
+    public static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";
+    public static final String DEFAULT_PROJECT_VALUE = "default";
 
     // Named Entities: mapping from labels to models
     public static HashMap<String, String> PROPERTY_NE_MODELS;
+
+    // Custom models related: key vs file path
+    private String globalProject;
+    public static HashMap<String, String> CUSTOM_PROPERTY_NE_MODELS;
+    public static HashMap<String, String> CUSTOM_PROPERTY_SENTIMENT_MODELS;
 
     // Named Entities: mapping from labels to identifiers that are used in the graph
     //public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
 
     // Named Entities: objects
-    public HashMap<String, NameFinderME> nameDetector = new HashMap<String, NameFinderME>();
+    public HashMap<String, NameFinderME> nameDetectors;
 
     public final List<String> annotators;
     public final List<String> stopWords;
@@ -99,20 +105,31 @@ public class OpenNLPPipeline {
     //private LemmatizerME lemmaDetector;
     private DictionaryLemmatizer lemmaDetector; // needs OpenNLP >=1.7
     //private SimpleLemmatizer lemmaDetector; // for OpenNLP < 1.7
+
+    // Sentiment Analysis: objects
     private DocumentCategorizerME sentimentDetector;
+    public HashMap<String, DocumentCategorizerME> sentimentDetectors;
+
 
     public OpenNLPPipeline(Properties properties) {
+        this.globalProject = DEFAULT_PROJECT_VALUE;
+
         // Named Entities: mapping from labels to models
         PROPERTY_NE_MODELS = new HashMap<String, String>();
         PROPERTY_NE_MODELS.put("namefinder", "en-ner-person.bin");
-        /*PROPERTY_NE_MODELS.put("datefinder", "en-ner-date.bin");
+        PROPERTY_NE_MODELS.put("datefinder", "en-ner-date.bin");
         PROPERTY_NE_MODELS.put("locationfinder", "en-ner-location.bin");
         PROPERTY_NE_MODELS.put("timefinder", "en-ner-time.bin");
         PROPERTY_NE_MODELS.put("organizationfinder", "en-ner-organization.bin");
         PROPERTY_NE_MODELS.put("moneyfinder", "en-ner-money.bin");
-        PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");*/
+        PROPERTY_NE_MODELS.put("percentagefinder", "en-ner-percentage.bin");
 
-        nameDetector = new HashMap<String, NameFinderME>();
+        CUSTOM_PROPERTY_NE_MODELS = new HashMap<String, String>();
+        CUSTOM_PROPERTY_SENTIMENT_MODELS = new HashMap<String, String>();
+        findModelFiles("import/");
+
+        nameDetectors = new HashMap<String, NameFinderME>();
+        sentimentDetectors = new HashMap<String, DocumentCategorizerME>();
 
         annotators = Arrays.asList(properties.getProperty("annotators", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
         stopWords  = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
@@ -165,11 +182,22 @@ public class OpenNLPPipeline {
     }
 
     private void namedEntitiesFinders(Properties properties) throws FileNotFoundException {
+        // Default NE models
         for (String key : PROPERTY_NE_MODELS.keySet()) {
           InputStream is = getInputStream(properties, key, PROPERTY_NE_MODELS.get(key));
+          if (is==null) continue;
           TokenNameFinderModel nameModel = loadModel(TokenNameFinderModel.class, is);
           closeInputStream(is, key);
-          nameDetector.put(key, new NameFinderME(nameModel));
+          nameDetectors.put(key, new NameFinderME(nameModel));
+        }
+
+        // Custom NE models (in the `import/` dir of the Neo4j installation)
+        for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
+          InputStream is = new FileInputStream(new File(CUSTOM_PROPERTY_NE_MODELS.get(key)));
+          if (is==null) continue;
+          TokenNameFinderModel nameModel = loadModel(TokenNameFinderModel.class, is);
+          closeInputStream(is, key);
+          nameDetectors.put(key, new NameFinderME(nameModel));
         }
     }
 
@@ -183,13 +211,33 @@ public class OpenNLPPipeline {
     }
 
     private void categorizer(Properties properties) throws FileNotFoundException {
-        /*InputStream is = getInputStream(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_MODEL);
-        DoccatModel doccatModel = loadModel(DoccatModel.class, is);
-        closeInputStream(is, PROPERTY_PATH_SENTIMENT_MODEL);
-        sentimentDetector = new DocumentCategorizerME(doccatModel);*/
+        // first a default model
+        InputStream is = getInputStream(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_MODEL);
+        if (is!=null) {
+          DoccatModel doccatModel = loadModel(DoccatModel.class, is);
+          closeInputStream(is, PROPERTY_PATH_SENTIMENT_MODEL);
+          sentimentDetectors.put(DEFAULT_PROJECT_VALUE, new DocumentCategorizerME(doccatModel));
+        } else
+          sentimentDetectors.put(DEFAULT_PROJECT_VALUE, null);
+        sentimentDetector = sentimentDetectors.get(DEFAULT_PROJECT_VALUE);
+
+        // next custom models (in the `import/` dir of the Neo4j installation)
+        for (String key : CUSTOM_PROPERTY_SENTIMENT_MODELS.keySet()) {
+          try {
+            is = new FileInputStream(new File(CUSTOM_PROPERTY_SENTIMENT_MODELS.get(key)));
+          } catch (IOException ex) {
+            LOG.error("Error while opening file " + CUSTOM_PROPERTY_SENTIMENT_MODELS.get(key));
+            ex.printStackTrace();
+          }
+          if (is==null) continue;
+
+          DoccatModel doccatModel = loadModel(DoccatModel.class, is);
+          closeInputStream(is, PROPERTY_PATH_SENTIMENT_MODEL);
+          sentimentDetectors.put(key, new DocumentCategorizerME(doccatModel));
+        }
 
         // First: train a model
-        DoccatModel model = null;
+        /*DoccatModel model = null;
         ImprovisedInputStreamFactory dataIn = null;
         try {
           dataIn = new ImprovisedInputStreamFactory(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_TRAIN);
@@ -208,18 +256,17 @@ public class OpenNLPPipeline {
         }
 
         if (model!=null)
-          sentimentDetector = new DocumentCategorizerME(model);
+          sentimentDetector = new DocumentCategorizerME(model);*/
     }
 
     public void annotate(OpenNLPAnnotation document) {
-
         String text = document.getText();
         try {
             Span sentences[] = sentenceDetector.sentPosDetect(text);
             document.setSentences(sentences);
 
             document.getSentences().stream().forEach(sentence -> {
-                if (annotators.contains("tokenize")) {
+                if (annotators.contains("tokenize") && wordBreaker!=null) {
                   // Tokenization
                   Span[] word_spans = wordBreaker.tokenizePos(sentence.getSentence());
 
@@ -230,7 +277,7 @@ public class OpenNLPPipeline {
                     ArrayList<Span> fin_spans = new ArrayList<Span>();
                     ArrayList<String> fin_words = new ArrayList<String>();
                     for (int i=0; i<words.length; i++) {
-                      if (stopWords.contains(words[i]))
+                      if (stopWords.contains(words[i].toLowerCase()))
                         continue;
                       fin_words.add(words[i]);
                       fin_spans.add(word_spans[i]);
@@ -238,8 +285,9 @@ public class OpenNLPPipeline {
                     sentence.setWords(fin_words.toArray(new String[fin_words.size()]));
                     sentence.setWordSpans(fin_spans.toArray(new Span[fin_spans.size()]));
                   }
+                  LOG.debug("Final words: " + Arrays.toString(sentence.getWords()));
 
-                  if (annotators.contains("pos")) {
+                  if (annotators.contains("pos") && posme!=null) {
                     // Part of Speach
                     String[] posTags = posme.tag(sentence.getWords());
                     sentence.setPosTags(posTags);
@@ -297,18 +345,37 @@ public class OpenNLPPipeline {
                   if (annotators.contains("ner")) {
                     // Named Entities identification
                     for (String key : PROPERTY_NE_MODELS.keySet()) {
-                      Arrays.asList(nameDetector.get(key).find(sentence.getWords())).stream()
+                      if (!nameDetectors.containsKey(key)) {
+                        LOG.warn("NER model with key " + key + " not available.");
+                        continue;
+                      }
+                      Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
                             .forEach(span -> {
                                 sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
-                                LOG.info(span.getType());
+                                LOG.debug("NER type: " + span.getType());
                             });
+                    }
+                    if (this.globalProject!=null && this.globalProject!="") {
+                      for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
+                        if (!nameDetectors.containsKey(key)) {
+                          LOG.warn("Custom NER model with key " + key + " not available.");
+                          continue;
+                        }
+                        if (key.split("-").length==0) continue;
+                        if (!key.split("-")[0].equals(this.globalProject)) continue;
+                        Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
+                              .forEach(span -> {
+                                  sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
+                                  LOG.info("Custom NER type: " + span.getType());
+                              });
+                      }
                     }
                   } // ner
                   else
                     sentence.setDefaultNamedEntities();
                 } // tokenize
 
-                if (annotators.contains("sentiment")) {
+                if (annotators.contains("sentiment") && sentimentDetector!=null) {
                   double[] outcomes = sentimentDetector.categorize(sentence.getSentence());
                   String category = sentimentDetector.getBestCategory(outcomes);
                   if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
@@ -324,41 +391,61 @@ public class OpenNLPPipeline {
     }
 
     public void train(String project, String alg, String model_str, String file, String lang) {
-      String fileOut = createModelFileName(lang, alg, model_str, project);
-      //LOG.info(project + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + file);
+      String proj = project.toLowerCase();
+      String fileOut = createModelFileName(lang, alg, model_str, proj);
+      String newKey = proj + "-" + model_str;
+      //LOG.info(proj + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + file);
+
+      // open file
+      ImprovisedInputStreamFactory dataIn = null;
+      ObjectStream<String> lineStream = null;
+      try {
+        dataIn = new ImprovisedInputStreamFactory(null, "", file);
+        lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
+      } catch (IOException ex) {
+        LOG.error("Failure while opening file " + file, ex);
+        throw new RuntimeException("Failure while opening file " + file, ex);
+      }
 
       if (alg.toLowerCase().equals("ner")) {
-        // open file
-        ImprovisedInputStreamFactory dataIn = null;
-        ObjectStream<NameSample> sampleStream = null;
-        try {
-          dataIn = new ImprovisedInputStreamFactory(null, "", file);
-          ObjectStream<String> lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
-          sampleStream = new NameSampleDataStream(lineStream);
-          //lineStream.close();
-        } catch (IOException ex) {
-          LOG.error("Failure while opening file " + file, ex);
-          throw new RuntimeException("Failure while opening file " + file, ex);
-        } /*finally {
-          if (dataIn!=null)
-            dataIn.closeInputStream();
-        }*/
-
         // train model
         TokenNameFinderModel model;
+        ObjectStream<NameSample> sampleStream = new NameSampleDataStream(lineStream);
         try {
           model = NameFinderME.train(lang, null, sampleStream, TrainingParameters.defaultParams(), new TokenNameFinderFactory());
-          //saveModel(model, fileOut);
+          saveModel(model, fileOut);
           sampleStream.close();
         } catch (Exception ex) {
           LOG.error("Error while training model " + alg + "/" + model_str, ex);
           throw new RuntimeException("Error while training model " + alg + "/" + model_str, ex);
         }
 
-        // incorporate this new model to the OpenNLPPipeline
-        PROPERTY_NE_MODELS.put(project + "_" + model_str, fileOut);
-        if (!nameDetector.containsKey(project + "_" + model_str)) {
-          nameDetector.put(project + "_" + model_str, new NameFinderME(model));
+        // incorporate this model to the OpenNLPPipeline
+        CUSTOM_PROPERTY_NE_MODELS.put(newKey, fileOut);
+        if (!nameDetectors.containsKey(newKey)) {
+          nameDetectors.put(newKey, new NameFinderME(model));
+        }
+      }
+
+      else if (alg.toLowerCase().equals("sentiment")) {
+        DoccatModel model = null;
+        try {
+          ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream);
+          TrainingParameters params = new TrainingParameters();
+          params.put(TrainingParameters.CUTOFF_PARAM, "2");
+          params.put(TrainingParameters.ITERATIONS_PARAM, "30");
+          model = DocumentCategorizerME.train("en", sampleStream, params, new DoccatFactory());
+          //model = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
+          saveModel(model, fileOut);
+          sampleStream.close();
+        } catch (IOException e) {
+          LOG.error("IOError while training a custom model for sentiment analysis.");
+          e.printStackTrace();
+        }
+
+        if (model!=null) {
+          CUSTOM_PROPERTY_SENTIMENT_MODELS.put(/*newKey*/proj, fileOut);
+          sentimentDetectors.put(/*newKey*/proj, new DocumentCategorizerME(model));
         }
       }
 
@@ -366,7 +453,65 @@ public class OpenNLPPipeline {
         throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
       }
 
+      dataIn.closeInputStream();
+
       return;
+    }
+
+    public void useThisCustomNER(String project) {
+      if (project==null) {
+        updateProjectValue(DEFAULT_PROJECT_VALUE);
+      } else if (project.length()==0) {
+        updateProjectValue(DEFAULT_PROJECT_VALUE);
+      } else {
+        updateProjectValue(project.toLowerCase());
+      }
+    }
+
+    private void updateProjectValue(String project) {
+      this.globalProject = project;
+
+      if (sentimentDetectors.containsKey(this.globalProject))
+        sentimentDetector = sentimentDetectors.get(this.globalProject);
+      else {
+        LOG.warn("Required sentiment model (" + this.globalProject + ") doesn't exist, setting it to the default.");
+        sentimentDetector = sentimentDetectors.get(DEFAULT_PROJECT_VALUE);
+      }
+    }
+
+    private void findModelFiles(String path) {
+      if (path==null) return;
+      if (path.length()==0) {
+        LOG.warn("Scanning for model files: wrong path specified.");
+        return;
+      }
+      File folder = new File(path);
+      File[] listOfFiles = folder.listFiles();
+
+      String p = path;
+      if (p.charAt(p.length()-1)!="/".charAt(0)) path += "/";
+      LOG.debug("path = " + path);
+
+      for (int i=0; i<listOfFiles.length; i++) {
+        if (!listOfFiles[i].isFile())
+          continue;
+        String name = listOfFiles[i].getName();
+        String[] sp = name.split("-");
+        if (sp.length<3) continue;
+        if (!name.substring(name.length()-4).equals(".bin")) continue;
+        LOG.info("Custom models: Found file " + name);
+
+        String key = sp[sp.length-1].toLowerCase();
+        key = key.substring(0, key.length()-4);
+        for (int j=2; j<sp.length-1; j++)
+          key += "-" + sp[2];
+
+        LOG.info("Scanning for model files: registering model name for algorithm " + sp[1] + " under the key " + key);
+        if (sp[1].toLowerCase().equals("ner"))
+          CUSTOM_PROPERTY_NE_MODELS.put(key, path + name);
+        else if (sp[1].toLowerCase().equals("sentiment"))
+          CUSTOM_PROPERTY_SENTIMENT_MODELS.put(/*key*/sp[sp.length-1].toLowerCase().substring(0, sp[sp.length-1].length()-4), path + name);
+      }
     }
 
     private <T extends BaseModel> T loadModel(Class<T> clazz, InputStream in) {
@@ -399,7 +544,7 @@ public class OpenNLPPipeline {
 
     private InputStream getInputStream(Properties properties, String property, String defaultValue) {
         String path = defaultValue;
-        if (properties!=null) properties.getProperty(property, defaultValue);
+        if (properties!=null) path = properties.getProperty(property, defaultValue);
         InputStream is;
         try {
             if (path.startsWith("file://")) {
@@ -427,11 +572,11 @@ public class OpenNLPPipeline {
 
     private String createModelFileName(String lang, String alg, String model, String project) {
       String delim = "-";
-      String name = lang + delim + alg;
+      String name = "import/" + lang.toLowerCase() + delim + alg.toLowerCase();
       if (model!=null) {
-        if (model.length()>0) name += delim + model;
+        if (model.length()>0) name += delim + model.toLowerCase();
       }
-      name += delim + project + ".bin"; 
+      name += delim + project.toLowerCase() + ".bin"; 
       return name;
     }
 
