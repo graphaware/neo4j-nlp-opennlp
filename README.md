@@ -63,12 +63,13 @@ For the moment, only Named Entity Recognition (NER) in OpenNLP Text Processor is
 ```
 CALL ga.nlp.train({[project: "my_XY",] alg: "NER", model: "component", file: "<path_to_your_training_file>" [, lang: "en"]})
 ```
-  * `project` (case insensitive) allows to specify in the `annotate()` procedure that we also want to use the custom NER model(s)
-  * `alg` (case insensitive) specifies which algorithm is about to be trained; currently available algs: NER, sentiment
+  * `project` (case insensitive) allows to specify in the `annotate()` procedure that we wannt, apart from the default models, to use also the custom model(s) associated with `project`
+  * `alg` (case insensitive) specifies which algorithm is about to be trained; currently available algs: `NER`, `sentiment`
   * `model` in combination with `alg` (and with `project` if it's specified) provides a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
   * `file` is path to the training data file
   * `lang` (default is "en") specifies the language
-  * resulting model is save to a binary file in Neo4j's `import/` directory: `<lang>-<alg>-<model>-<project>.bin`
+
+The trained model is saved to a binary file in Neo4j's `import/` directory: `<lang>-<alg>-<model>-<project>.bin`. Each time Neo4j starts, this directory is scanned for files (models) in this format, i.e. you don't need to train the same model again when you restart Neo4j.
 
 ```
 # Example of a text to analyze
@@ -81,3 +82,5 @@ CALL ga.nlp.annotate({text:l.lesson, id: l.uuid, customProject: "my_XY"}) YIELD 
 MERGE (l)-[:HAS_ANNOTATED_TEXT]->(result)
 RETURN l, result;
 ```
+
+For Named Entities, all registered models are used. The sentiment analysis is performed only once using the latest (or last in the list in `import/*`) model.
