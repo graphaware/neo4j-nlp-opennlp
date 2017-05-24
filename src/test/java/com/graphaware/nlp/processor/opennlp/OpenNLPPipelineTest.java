@@ -46,7 +46,11 @@ public class OpenNLPPipelineTest {
     public void testAnnotate() {
         String text = "Hello Dralyn. Barack Hussein Obama II  is the 44th and current President of the United States, and the first African American to hold the office.";
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
-        OpenNLPPipeline instance = new PipelineBuilder().build();
+        OpenNLPPipeline instance = new PipelineBuilder()
+                .tokenize()
+                /*.extractPos()
+                .extractRelations()*/
+                .build();
         instance.annotate(document);
         
         document.getSentences().forEach((sentence) -> {

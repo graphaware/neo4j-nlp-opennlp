@@ -23,11 +23,14 @@ import com.graphaware.nlp.domain.Tag;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import java.util.Optional;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,26 +48,58 @@ public class OpenNLPTextProcessor implements TextProcessor {
     private final Pattern patternCheck;
 
     public OpenNLPTextProcessor() {
-        //Creating default pipeline
+        //Creating default pipelines
+        createTokenizerPipeline();
+        createSentimentPipeline();
+        createTokenizerAndSentimentPipeline();
         createPhrasePipeline();
 
         String pattern = "\\p{Punct}";
         patternCheck = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE);
     }
 
-    private void createPhrasePipeline() {
+    private void createTokenizerPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                .defaultStopWordAnnotator()
+                .threadNumber(6)
+                .build();
+        pipelines.put(TOKENIZER, pipeline);
+    }
+
+    private void createSentimentPipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                .extractSentiment()
+                .threadNumber(6)
+                .build();
+        pipelines.put(SENTIMENT, pipeline);
+    }
+
+    private void createTokenizerAndSentimentPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .defaultStopWordAnnotator()
                 .extractSentiment()
-                .extractCoref()
+                .threadNumber(6)
+                .build();
+        pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
+    }
+
+    private void createPhrasePipeline() {
+        OpenNLPPipeline pipeline = new PipelineBuilder()
+                .tokenize()
+                .defaultStopWordAnnotator()
+                //.extractCoref()
                 .extractRelations()
+                .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(PHRASE, pipeline);
     }
 
-    public AnnotatedText annotateText(String text, Object id, int level, boolean store) {
+    @Override
+    public AnnotatedText annotateText(String text, Object id, int level, String lang, boolean store) {
         String pipeline;
         switch (level) {
             case 0:
@@ -79,27 +114,33 @@ public class OpenNLPTextProcessor implements TextProcessor {
             default:
                 pipeline = TOKENIZER;
         }
-        return annotateText(text, id, pipeline, store);
+        return annotateText(text, id, pipeline, lang, store, "");
     }
 
-    public AnnotatedText annotateText(String text, Object id, String name, boolean store) {
-        OpenNLPPipeline pipeline = pipelines.get(name);
-        if (pipeline == null) {
-            throw new RuntimeException("Pipeline: " + name + " doesn't exist");
+    @Override
+    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, String project) {
+        if (name.length()==0) {
+          name = TOKENIZER;
+          LOG.info("Using default pipeline: " + name);
         }
-        AnnotatedText result = new AnnotatedText(id);
+        OpenNLPPipeline pipeline = pipelines.get(name);
+        if (pipeline==null)
+          throw new RuntimeException("Pipeline: " + name + " doesn't exist");
+        pipeline.reset();
+        pipeline.useTheseCustomModels(project);
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipeline.annotate(document);
+        LOG.info("Annotation for id " + id + " finished.");
+
+        AnnotatedText result = new AnnotatedText(id);
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         final AtomicInteger sentenceSequence = new AtomicInteger(0);
-        sentences.stream().map((sentence) -> {
-            return sentence;
-        }).forEach((sentence) -> {
+        sentences.stream().forEach((sentence) -> {
             int sentenceNumber = sentenceSequence.getAndIncrement();
             String sentenceId = id + "_" + sentenceNumber;
-            final Sentence newSentence = new Sentence(sentence.toString(), store, sentenceId, sentenceNumber);
-            //extractTokens(sentence, newSentence);
-            //extractSentiment(sentence, newSentence);
+            final Sentence newSentence = new Sentence(sentence.getSentence(), store, sentenceId, sentenceNumber);
+            extractTokens(lang, sentence, newSentence);
+            extractSentiment(sentence, newSentence);
             extractPhrases(sentence, newSentence);
             result.addSentence(newSentence);
         });
@@ -115,65 +156,32 @@ public class OpenNLPTextProcessor implements TextProcessor {
         });
     }
 
-//    protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-//        int score = extractSentiment(sentence);
-//        newSentence.setSentiment(score);
-//    }
+    protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
+        int score = -1;
+        if (sentence.getSentiment()!=null && !sentence.getSentiment().equals("-")) {
+          try {
+            score = Integer.valueOf(sentence.getSentiment());
+          } catch (NumberFormatException ex) {
+            LOG.error("NumberFormatException: error extracting sentiment " + sentence.getSentiment() + " as a number.");
+          }
+        }
+        newSentence.setSentiment(score);
+    }
 
-//    protected void extractTokens(OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-//        String[] tokens = sentence.getWords();
-//        TokenHolder currToken = new TokenHolder();
-//        currToken.setNe(backgroundSymbol);
-//        tokens.stream()
-//                .filter((token) -> (token != null) && checkPuntuation(token.get(CoreAnnotations.LemmaAnnotation.class)))
-//                .map((token) -> {
-//                    //
-//                    String currentNe = StringUtils.getNotNullString(token.get(CoreAnnotations.NamedEntityTagAnnotation.class));
-//                    if (currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag tag = getTag(token);
-//                        if (tag != null) {
-//                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-//                        }
-//                    } else if (currentNe.equals(backgroundSymbol) && !currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag newTag = new Tag(currToken.getToken());
-//                        newTag.setNe(currToken.getNe());
-//                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(newTag));
-//                        currToken.reset();
-//                        Tag tag = getTag(token);
-//                        if (tag != null) {
-//                            newSentence.addTagOccurrence(token.beginPosition(), token.endPosition(), newSentence.addTag(tag));
-//                        }
-//                    } else if (!currentNe.equals(currToken.getNe()) && !currToken.getNe().equals(backgroundSymbol)) {
-//                        Tag tag = new Tag(currToken.getToken());
-//                        tag.setNe(currToken.getNe());
-//                        newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-//                        currToken.reset();
-//                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    } else if (!currentNe.equals(backgroundSymbol) && currToken.getNe().equals(backgroundSymbol)) {
-//                        currToken.updateToken(StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class)));
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    } else {
-//                        String before = StringUtils.getNotNullString(token.get(CoreAnnotations.BeforeAnnotation.class));
-//                        String currentText = StringUtils.getNotNullString(token.get(CoreAnnotations.OriginalTextAnnotation.class));
-//                        currToken.updateToken(before);
-//                        currToken.updateToken(currentText);
-//                        currToken.setBeginPosition(token.beginPosition());
-//                        currToken.setEndPosition(token.endPosition());
-//                    }
-//                    return currentNe;
-//                }).forEach((currentNe) -> {
-//            currToken.setNe(currentNe);
-//        });
-//
-//        if (currToken.getToken().length() > 0) {
-//            Tag tag = new Tag(currToken.getToken());
-//            tag.setNe(currToken.getNe());
-//            newSentence.addTagOccurrence(currToken.getBeginPosition(), currToken.getEndPosition(), newSentence.addTag(tag));
-//        }
-//    }
+    protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
+        String[] tokens = sentence.getWords();
+        //String text = sentence.getSentence();
+        //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
+        int idx = -1;
+        for (String token : tokens) {
+          idx++;
+          if (token==null || !checkPuntuation(token))
+            continue;
+          //System.out.println("Processing word: " + token);
+          Tag newTag = getTag(sentence, idx, lang);
+          newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
+        }
+    }
 
 //    private void extractRelationship(AnnotatedText annotatedText, List<CoreMap> sentences, Annotation document) {
 //        Map<Integer, CorefChain> corefChains = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
@@ -210,32 +218,8 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //        }
 //    }
 
-//    public AnnotatedText sentiment(AnnotatedText annotated) {
-//        StanfordCoreNLP pipeline = pipelines.get(SENTIMENT);
-//        annotated.getSentences().parallelStream().forEach((item) -> {
-//            Annotation document = new Annotation(item.getSentence());
-//            pipeline.annotate(document);
-//            List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-//            Optional<CoreMap> sentence = sentences.stream().findFirst();
-//            if (sentence != null && sentence.isPresent()) {
-//                extractSentiment(sentence.get(), item);
-//            }
-//        });
-//        return annotated;
-//    }
-//
-//    private int extractSentiment(CoreMap sentence) {
-//        Tree tree = sentence
-//                .get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
-//        if (tree == null) {
-//            return Sentence.NO_SENTIMENT;
-//        }
-//        int score = RNNCoreAnnotations.getPredictedClass(tree);
-//        return score;
-//    }
-
     @Override
-    public Tag annotateSentence(String text) {
+    public Tag annotateSentence(String text, String lang) {
 //        Annotation document = new Annotation(text);
 //        pipelines.get(SENTIMENT).annotate(document);
 //        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
@@ -252,7 +236,8 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-    public Tag annotateTag(String text) {
+    @Override
+    public Tag annotateTag(String text, String lang) {
 //        Annotation document = new Annotation(text);
 //        pipelines.get(TOKENIZER).annotate(document);
 //        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
@@ -269,27 +254,62 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-//    private Tag getTag(CoreLabel token) {
-//        Pair<Boolean, Boolean> stopword = token.get(StopwordAnnotator.class);
-//        if (stopword.first()) {
-//            return null;
-//        }
-//        String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
-//        String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
-//        String lemma;
-//
-//        if (ne.equals(backgroundSymbol)) {
-//            lemma = token.get(CoreAnnotations.LemmaAnnotation.class);
-//        } else {
-//            lemma = token.get(CoreAnnotations.OriginalTextAnnotation.class);
-//        }
-//
-//        Tag tag = new Tag(lemma);
-//        tag.setPos(pos);
-//        tag.setNe(ne);
-//        LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
-//        return tag;
-//    }
+    private Tag getTag(OpenNLPAnnotation.Sentence sentence, int tokenIdx, String lang) {
+      String pos = "-";
+      String ne  = "-";
+      String lemma = sentence.getWords()[tokenIdx];
+
+      if (sentence.getPosTags()!=null) {
+        try {
+          if (sentence.getPosTags()[tokenIdx]!=null)
+            pos = sentence.getPosTags()[tokenIdx];
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of POS tags.", tokenIdx);
+        }
+      }
+
+      if (sentence.getNamedEntities()!=null) {
+        try {
+          if (sentence.getNamedEntities()[tokenIdx]!=null)
+            ne = sentence.getNamedEntities()[tokenIdx];
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of named entities.", tokenIdx);
+        }
+      }
+
+      if (sentence.getLemmas()!=null) {
+        try {
+          if (!sentence.getLemmas()[tokenIdx].equals("O")) // "0" is default lemma value if there's no match with dictionary, in which case we want to keep the original word
+            lemma = sentence.getLemmas()[tokenIdx];
+        } catch (ArrayIndexOutOfBoundsException ex) {
+          LOG.error("Index %d not in array of lemmas.", tokenIdx);
+        }
+      }
+
+      Tag tag = new Tag(lemma, lang);
+      tag.setPos(pos);
+      tag.setNe(ne);
+      LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
+      return tag;
+    }
+
+    @Override
+    public List<Tag> annotateTags(String text, String lang) {
+        /*List<Tag> result = new ArrayList<>();
+        Annotation document = new Annotation(text);
+        pipelines.get(TOKENIZER).annotate(document);
+        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
+        Optional<CoreMap> sentence = sentences.stream().findFirst();
+        if (sentence.isPresent()) {
+            Stream<Tag> oTags = sentence.get().get(CoreAnnotations.TokensAnnotation.class).stream()
+                    .map((token) -> getTag(lang, token))
+                    .filter((tag) -> (tag != null) && checkPuntuation(tag.getLemma()));
+            oTags.forEach((tag) -> result.add(tag));
+        }
+        return result;*/
+        return null;
+    }
+
 
     public boolean checkPuntuation(String value) {
         Matcher match = patternCheck.matcher(value);
@@ -297,8 +317,35 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     @Override
-    public AnnotatedText sentiment(AnnotatedText annotated) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public AnnotatedText sentiment(AnnotatedText annotated, String project) {
+        OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
+        if (pipeline==null) {
+          throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
+        }
+        pipeline.reset();
+        pipeline.useTheseCustomModels(project);
+        annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
+            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
+            pipeline.annotate(document);
+            List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+            Optional<OpenNLPAnnotation.Sentence> sentence = sentences.stream().findFirst();
+            if (sentence!=null && sentence.isPresent()) {
+              extractSentiment(sentence.get(), item);
+            }
+        });
+        return annotated;
+    }
+
+    @Override
+    public void train(String project, String alg, String model, String file, String lang) {
+        // training could be done directly here, but it's better to have everything model-implementation related in one class, therefore ...
+        OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
+        if (pipeline==null) {
+          throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
+        }
+        pipeline.reset();
+        pipeline.train(project, alg, model, file, lang);
+        return;
     }
 
 
@@ -440,7 +487,8 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public List<String> getPipelines() {
         return new ArrayList<>(pipelines.keySet());
     }
-    
+
+    @Override    
     public boolean checkPipeline(String name) {
         return pipelines.containsKey(name);
     }
