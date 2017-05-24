@@ -118,20 +118,19 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     @Override
-    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, String nerProject) {
-        if (name=="") {
+    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, String project) {
+        if (name.length()==0) {
           name = TOKENIZER;
           LOG.info("Using default pipeline: " + name);
         }
         OpenNLPPipeline pipeline = pipelines.get(name);
         if (pipeline==null)
           throw new RuntimeException("Pipeline: " + name + " doesn't exist");
-
-        pipeline.useThisCustomNER(nerProject);
+        pipeline.reset();
+        pipeline.useTheseCustomModels(project);
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipeline.annotate(document);
         LOG.info("Annotation for id " + id + " finished.");
-        pipeline.useThisCustomNER(null);
 
         AnnotatedText result = new AnnotatedText(id);
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
@@ -159,11 +158,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
         int score = -1;
-        if (sentence.getSentiment()!=null && sentence.getSentiment()!="-") {
+        if (sentence.getSentiment()!=null && !sentence.getSentiment().equals("-")) {
           try {
             score = Integer.valueOf(sentence.getSentiment());
           } catch (NumberFormatException ex) {
-            LOG.error("NumberFormatException: error extracting sentiment as a number.");
+            LOG.error("NumberFormatException: error extracting sentiment " + sentence.getSentiment() + " as a number.");
           }
         }
         newSentence.setSentiment(score);
@@ -280,7 +279,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
       if (sentence.getLemmas()!=null) {
         try {
-          if (sentence.getLemmas()[tokenIdx]!="O") // "0" is default lemma value if there's no match with dictionary, in which case we want to keep the original word
+          if (!sentence.getLemmas()[tokenIdx].equals("O")) // "0" is default lemma value if there's no match with dictionary, in which case we want to keep the original word
             lemma = sentence.getLemmas()[tokenIdx];
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of lemmas.", tokenIdx);
@@ -318,11 +317,13 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     @Override
-    public AnnotatedText sentiment(AnnotatedText annotated) {
+    public AnnotatedText sentiment(AnnotatedText annotated, String project) {
         OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
         if (pipeline==null) {
           throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
         }
+        pipeline.reset();
+        pipeline.useTheseCustomModels(project);
         annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
             OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
             pipeline.annotate(document);
@@ -342,6 +343,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
         if (pipeline==null) {
           throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
+        pipeline.reset();
         pipeline.train(project, alg, model, file, lang);
         return;
     }

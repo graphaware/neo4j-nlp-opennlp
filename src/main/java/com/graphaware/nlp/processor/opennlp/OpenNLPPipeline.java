@@ -355,7 +355,7 @@ public class OpenNLPPipeline {
                                 LOG.debug("NER type: " + span.getType());
                             });
                     }
-                    if (this.globalProject!=null && this.globalProject!="") {
+                    if (this.globalProject!=null && this.globalProject.length()>0) {
                       for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
                         if (!nameDetectors.containsKey(key)) {
                           LOG.warn("Custom NER model with key " + key + " not available.");
@@ -381,7 +381,7 @@ public class OpenNLPPipeline {
                   if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
                     category = "2"; // not conclusive, setting it to "Neutral"
                   sentence.setSentiment(category);
-                  LOG.info("Sentence: " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
+                  LOG.info("Sentiment results: sentence = " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
                 }
             });
         } catch (Exception ex) {
@@ -458,22 +458,29 @@ public class OpenNLPPipeline {
       return;
     }
 
-    public void useThisCustomNER(String project) {
+    public void reset() {
+      updateProjectValue(DEFAULT_PROJECT_VALUE);
+    }
+
+    public void useTheseCustomModels(String project) {
       if (project==null) {
-        updateProjectValue(DEFAULT_PROJECT_VALUE);
+        //updateProjectValue(DEFAULT_PROJECT_VALUE);
+        return;
       } else if (project.length()==0) {
-        updateProjectValue(DEFAULT_PROJECT_VALUE);
+        //updateProjectValue(DEFAULT_PROJECT_VALUE);
+        return;
       } else {
-        updateProjectValue(project.toLowerCase());
+        updateProjectValue(project);
       }
     }
 
     private void updateProjectValue(String project) {
-      this.globalProject = project;
+      this.globalProject = project.toLowerCase();
 
-      if (sentimentDetectors.containsKey(this.globalProject))
+      if (sentimentDetectors.containsKey(this.globalProject)) {
+        LOG.info("Switching to a sentiment model: " + this.globalProject);
         sentimentDetector = sentimentDetectors.get(this.globalProject);
-      else {
+      } else {
         LOG.warn("Required sentiment model (" + this.globalProject + ") doesn't exist, setting it to the default.");
         sentimentDetector = sentimentDetectors.get(DEFAULT_PROJECT_VALUE);
       }
@@ -487,9 +494,11 @@ public class OpenNLPPipeline {
       }
       File folder = new File(path);
       File[] listOfFiles = folder.listFiles();
+      if (listOfFiles==null)
+        return;
 
       String p = path;
-      if (p.charAt(p.length()-1)!="/".charAt(0)) path += "/";
+      if (p.charAt(p.length()-1) != "/".charAt(0)) path += "/";
       LOG.debug("path = " + path);
 
       for (int i=0; i<listOfFiles.length; i++) {
