@@ -337,15 +337,14 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     @Override
-    public void train(String project, String alg, String model, String file, String lang) {
+    public String train(String project, String alg, String model, String file, String lang, Map<String, String> params) {
         // training could be done directly here, but it's better to have everything model-implementation related in one class, therefore ...
         OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
         if (pipeline==null) {
           throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
         pipeline.reset();
-        pipeline.train(project, alg, model, file, lang);
-        return;
+        return pipeline.train(project, alg, model, file, lang, params);
     }
 
 

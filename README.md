@@ -72,8 +72,25 @@ CALL ga.nlp.train({[project: "my_XY",] alg: "NER", model: "component", file: "<p
 The trained model is saved to a binary file in Neo4j's `import/` directory: `<lang>-<alg>-<model>-<project>.bin`. Each time Neo4j starts, this directory is scanned for files (models) in this format, i.e. you don't need to train the same model again when you restart Neo4j.
 
 Training files:
-  * `NER` - one sentence per line, one empty line between two different texts (paragraphs); there must be a space before and after each `<START:my_category>` and `<END>` statement
-  * `sentiment` - two columns separated by a white space (tab): the first column is a category as integer (0=VeryNegative, 1=Negative, 2=Neutral, 3=Positive, 4=VeryPositive), the second column is a sentence
+  * `NER` - one sentence per line, one empty line between two different texts (paragraphs); there must be a space before and after each `<START:my_category>` and `<END>` statement; example for two new categories ("component" and "tool"):
+```
+Implementing  <START:tool> remote-controlled pressure regulators <END>  and  <START:tool> digital pressure gauges <END>  in the designs of new systems would improve launch processing in future programs because they would prevent launch delays and provide for safer operations.
+With the capability to adjust pressures remotely, crews would not have to be sent into the field during hazardous operations.
+With  <START:tool> digital pressure gauges <END> , differences between local and remote pressure readings would be eliminated, and there would be no need to reconcile the differences.
+
+During the Space Shuttle STS-80 mission, the two planned Extravehicular Activities (EVA) were scrubbed when the astronauts discovered that the outer <START:component> airlock hatch <END> would not open.
+This impacted the plan to evaluate the EVA tools that would be used for the construction and maintenance of the International Space Station.
+Upon return from the mission, troubleshooting revealed that the  <START:component> airlock actuator <END>  that is used for latching and unlatching the hatch was defective.
+This  <START:component> actuator <END>  was removed and replaced.
+```
+  * `sentiment` - two columns separated by a white space (tab): the first column is a category as integer (0=VeryNegative, 1=Negative, 2=Neutral, 3=Positive, 4=VeryPositive), the second column is a sentence; example:
+```
+3   Watching a nice movie
+1   The painting is ugly, will return it tomorrow...
+3   One of the best soccer games, worth seeing it
+3   Very tasty, not only for vegetarians
+1   Damn..the train is late again...
+```
 
 ```
 # Example of a text to analyze

@@ -7,12 +7,11 @@ package com.graphaware.nlp.processor.opennlp;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.FileOutputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -21,6 +20,9 @@ import java.util.HashMap;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedList;
+import java.util.Collections;
+import java.util.Map;
 import java.util.stream.Collectors;
 import opennlp.tools.chunker.ChunkerME;
 import opennlp.tools.chunker.ChunkerModel;
@@ -31,28 +33,16 @@ import opennlp.tools.sentdetect.SentenceModel;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.namefind.TokenNameFinderModel;
-import opennlp.tools.namefind.TokenNameFinderFactory;
 import opennlp.tools.namefind.NameFinderME;
-import opennlp.tools.namefind.NameSampleDataStream;
 import opennlp.tools.namefind.NameSample;
 import opennlp.tools.lemmatizer.LemmatizerModel;      // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.LemmatizerME;         // needs OpenNLP >=1.7
 import opennlp.tools.lemmatizer.DictionaryLemmatizer; // needs OpenNLP >=1.7
 //import opennlp.tools.lemmatizer.SimpleLemmatizer;   // for OpenNLP < 1.7
 import opennlp.tools.doccat.DoccatModel;
-import opennlp.tools.doccat.DoccatFactory;
 import opennlp.tools.doccat.DocumentCategorizerME;
-import opennlp.tools.doccat.DocumentSampleStream;
-import opennlp.tools.doccat.DocumentSample;
 import opennlp.tools.util.Span;
 import opennlp.tools.util.model.BaseModel;
-import opennlp.tools.util.ObjectStream;
-import opennlp.tools.util.PlainTextByLineStream;
-import opennlp.tools.util.InputStreamFactory;
-import opennlp.tools.util.TrainingParameters;
-import opennlp.tools.util.MarkableFileInputStreamFactory;
-import opennlp.tools.util.model.BaseModel;
-import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,28 +225,6 @@ public class OpenNLPPipeline {
           closeInputStream(is, PROPERTY_PATH_SENTIMENT_MODEL);
           sentimentDetectors.put(key, new DocumentCategorizerME(doccatModel));
         }
-
-        // First: train a model
-        /*DoccatModel model = null;
-        ImprovisedInputStreamFactory dataIn = null;
-        try {
-          dataIn = new ImprovisedInputStreamFactory(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_TRAIN);
-          ObjectStream<String> lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
-          ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream);
-          TrainingParameters params = new TrainingParameters();
-          params.put(TrainingParameters.CUTOFF_PARAM, "2");
-          params.put(TrainingParameters.ITERATIONS_PARAM, "30");
-          model = DocumentCategorizerME.train("en", sampleStream, params, new DoccatFactory());
-          //model = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
-        } catch (IOException e) {
-          e.printStackTrace();
-        } finally {
-          if (dataIn!=null)
-            dataIn.closeInputStream();
-        }
-
-        if (model!=null)
-          sentimentDetector = new DocumentCategorizerME(model);*/
     }
 
     public void annotate(OpenNLPAnnotation document) {
@@ -355,7 +323,7 @@ public class OpenNLPPipeline {
                                 LOG.debug("NER type: " + span.getType());
                             });
                     }
-                    if (this.globalProject!=null && this.globalProject.length()>0) {
+                    if (!this.globalProject.equals(DEFAULT_PROJECT_VALUE)) {
                       for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
                         if (!nameDetectors.containsKey(key)) {
                           LOG.warn("Custom NER model with key " + key + " not available.");
@@ -390,72 +358,50 @@ public class OpenNLPPipeline {
         }
     }
 
-    public void train(String project, String alg, String model_str, String file, String lang) {
+    public String train(String project, String alg, String model_str, String fileTrain, String lang, Map<String, String> params) {
       String proj = project.toLowerCase();
       String fileOut = createModelFileName(lang, alg, model_str, proj);
       String newKey = proj + "-" + model_str;
-      //LOG.info(proj + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + file);
-
-      // open file
-      ImprovisedInputStreamFactory dataIn = null;
-      ObjectStream<String> lineStream = null;
-      try {
-        dataIn = new ImprovisedInputStreamFactory(null, "", file);
-        lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
-      } catch (IOException ex) {
-        LOG.error("Failure while opening file " + file, ex);
-        throw new RuntimeException("Failure while opening file " + file, ex);
-      }
+      //LOG.info(proj + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + fileTrain);
+      String result = "";
 
       if (alg.toLowerCase().equals("ner")) {
-        // train model
-        TokenNameFinderModel model;
-        ObjectStream<NameSample> sampleStream = new NameSampleDataStream(lineStream);
-        try {
-          model = NameFinderME.train(lang, null, sampleStream, TrainingParameters.defaultParams(), new TokenNameFinderFactory());
-          saveModel(model, fileOut);
-          sampleStream.close();
-        } catch (Exception ex) {
-          LOG.error("Error while training model " + alg + "/" + model_str, ex);
-          throw new RuntimeException("Error while training model " + alg + "/" + model_str, ex);
-        }
+        NERModelTool nerModel = new NERModelTool(fileTrain, model_str, lang, params);
+        nerModel.train();
+        result = nerModel.validate();
+        nerModel.saveModel(fileOut);
 
         // incorporate this model to the OpenNLPPipeline
-        CUSTOM_PROPERTY_NE_MODELS.put(newKey, fileOut);
-        if (!nameDetectors.containsKey(newKey)) {
-          nameDetectors.put(newKey, new NameFinderME(model));
+        if (nerModel.getModel()!=null) {
+          CUSTOM_PROPERTY_NE_MODELS.put(newKey, fileOut);
+          if (!nameDetectors.containsKey(newKey)) {
+            nameDetectors.put(newKey, new NameFinderME((TokenNameFinderModel)nerModel.getModel()));
+          }
         }
+
+        nerModel.close();
       }
 
       else if (alg.toLowerCase().equals("sentiment")) {
-        DoccatModel model = null;
-        try {
-          ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream);
-          TrainingParameters params = new TrainingParameters();
-          params.put(TrainingParameters.CUTOFF_PARAM, "2");
-          params.put(TrainingParameters.ITERATIONS_PARAM, "30");
-          model = DocumentCategorizerME.train("en", sampleStream, params, new DoccatFactory());
-          //model = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
-          saveModel(model, fileOut);
-          sampleStream.close();
-        } catch (IOException e) {
-          LOG.error("IOError while training a custom model for sentiment analysis.");
-          e.printStackTrace();
+        SentimentModelTool sentModel = new SentimentModelTool(fileTrain, model_str, lang, params);
+        sentModel.train();
+        result = sentModel.validate();
+        sentModel.saveModel(fileOut);
+
+        // incorporate this model to the OpenNLPPipeline
+        if (sentModel.getModel()!=null) {
+          CUSTOM_PROPERTY_SENTIMENT_MODELS.put(proj, fileOut);
+          sentimentDetectors.put(proj, new DocumentCategorizerME((DoccatModel)sentModel.getModel()));
         }
 
-        if (model!=null) {
-          CUSTOM_PROPERTY_SENTIMENT_MODELS.put(/*newKey*/proj, fileOut);
-          sentimentDetectors.put(/*newKey*/proj, new DocumentCategorizerME(model));
-        }
+        sentModel.close();
       }
 
       else {
         throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
       }
 
-      dataIn.closeInputStream();
-
-      return;
+      return result;
     }
 
     public void reset() {
@@ -479,11 +425,11 @@ public class OpenNLPPipeline {
 
       if (sentimentDetectors.containsKey(this.globalProject)) {
         LOG.info("Switching to a sentiment model: " + this.globalProject);
-        sentimentDetector = sentimentDetectors.get(this.globalProject);
       } else {
         LOG.warn("Required sentiment model (" + this.globalProject + ") doesn't exist, setting it to the default.");
-        sentimentDetector = sentimentDetectors.get(DEFAULT_PROJECT_VALUE);
+        this.globalProject = DEFAULT_PROJECT_VALUE;
       }
+      sentimentDetector = sentimentDetectors.get(this.globalProject);
     }
 
     private void findModelFiles(String path) {
@@ -515,7 +461,7 @@ public class OpenNLPPipeline {
         for (int j=2; j<sp.length-1; j++)
           key += "-" + sp[2];
 
-        LOG.info("Scanning for model files: registering model name for algorithm " + sp[1] + " under the key " + key);
+        LOG.debug("Scanning for model files: registering model name for algorithm " + sp[1] + " under the key " + key);
         if (sp[1].toLowerCase().equals("ner"))
           CUSTOM_PROPERTY_NE_MODELS.put(key, path + name);
         else if (sp[1].toLowerCase().equals("sentiment"))
@@ -590,36 +536,32 @@ public class OpenNLPPipeline {
     }
 
 
-    class ImprovisedInputStreamFactory implements InputStreamFactory {
-      //private final String fileName;
-      private final Properties properties;
-      private final String property;
-      private final String defaultProperty;
-      private InputStream is;
+    /*class ImprovisedInputStreamFactory implements InputStreamFactory {
+      private File inputSourceFile;
+      private String inputSourceStr;
 
       ImprovisedInputStreamFactory(Properties properties, String property, String defaultValue) {
-        //this.fileName = name;
-        this.properties = properties;
-        this.property = property;
-        this.defaultProperty = defaultValue;
+        this.inputSourceFile = null;
+        this.inputSourceStr = defaultValue;
+        if (properties!=null) this.inputSourceStr = properties.getProperty(property, defaultValue);
 
-        this.is = getInputStream(this.properties, this.property, this.defaultProperty);
+        try {
+          if (this.inputSourceStr.startsWith("file://"))
+            this.inputSourceFile = new File(new URI(this.inputSourceStr));
+          else if (this.inputSourceStr.startsWith("/"))
+            this.inputSourceFile = new File(this.inputSourceStr);
+        } catch (Exception ex) {
+          LOG.error("Error while loading model from " + this.inputSourceStr);
+          throw new RuntimeException("Error while loading model from " + this.inputSourceStr);
+        }
       }
 
       @Override
       public InputStream createInputStream() throws IOException {
-        //return getInputStream(this.properties, this.property, this.defaultProperty);
-        return this.is;
+        LOG.debug("Creating input stream from " + this.inputSourceFile.getPath());
+        //return getClass().getClassLoader().getResourceAsStream(this.inputSourceFile.getPath());
+        return new FileInputStream(this.inputSourceFile.getPath());
       }
-
-      public void closeInputStream() {
-        try {
-          if (this.is!=null)
-            this.is.close();
-        } catch (IOException ex) {
-          LOG.warn("Attept to close input stream failed.");
-        }
-      }
-    }
+    }*/
 
 }
