@@ -275,8 +275,8 @@ public class OpenNLPPipeline {
                         }
                       }*/
                     } // lemma
-                    else
-                      sentence.setDefaultLemmas();
+                    //else
+                    //  sentence.setDefaultLemmas();
 
                     if (annotators.contains("relation")) {
                       // Chunking
@@ -301,27 +301,30 @@ public class OpenNLPPipeline {
                       if (chunkSentiments!=null)
                         sentence.setChunkSentiments(chunkSentiments.toArray(new String[chunkSentiments.size()]));
                     } // chunk
-                    else
-                      sentence.setDefaultChunks();
+                    //else
+                    //  sentence.setDefaultChunks();
                   } // pos
-                  else {
+                  /*else {
                     sentence.setDefaultPosTags();
                     sentence.setDefaultLemmas();
                     sentence.setDefaultChunks();
-                  }
+                  }*/
 
                   if (annotators.contains("ner")) {
-                    // Named Entities identification
+                    // Named Entities identification; needs to be performed after lemmas and POS (see implementation of Sentence.setNamedEntities())
                     for (String key : PROPERTY_NE_MODELS.keySet()) {
                       if (!nameDetectors.containsKey(key)) {
                         LOG.warn("NER model with key " + key + " not available.");
                         continue;
                       }
+                      List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
+                      sentence.setNamedEntities(ners);
+                      /*
                       Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
                             .forEach(span -> {
                                 sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
                                 LOG.debug("NER type: " + span.getType());
-                            });
+                            });*/
                     }
                     if (!this.globalProject.equals(DEFAULT_PROJECT_VALUE)) {
                       for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
@@ -331,16 +334,19 @@ public class OpenNLPPipeline {
                         }
                         if (key.split("-").length==0) continue;
                         if (!key.split("-")[0].equals(this.globalProject)) continue;
-                        Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
+                        List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
+                        sentence.setNamedEntities(ners);
+                        /*Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
                               .forEach(span -> {
                                   sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
                                   LOG.info("Custom NER type: " + span.getType());
-                              });
+                              });*/
                       }
                     }
+                    sentence.finalizeNamedEntities();
                   } // ner
-                  else
-                    sentence.setDefaultNamedEntities();
+                  //else
+                  //  sentence.setDefaultNamedEntities();
                 } // tokenize
 
                 if (annotators.contains("sentiment") && sentimentDetector!=null) {

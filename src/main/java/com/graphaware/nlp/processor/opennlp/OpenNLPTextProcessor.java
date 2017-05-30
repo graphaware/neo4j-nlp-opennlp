@@ -20,6 +20,7 @@ import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Phrase;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
+import com.graphaware.nlp.domain.NLPDefaultValues;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -149,6 +150,10 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     private void extractPhrases(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
+        if (sentence.getPhrasesIndex()==null) {
+          LOG.warn("extractPhrases(): phrases index empty, aborting extraction");
+          return;
+        }
         sentence.getPhrasesIndex().forEach((index) -> {
             Span chunk = sentence.getChunks()[index];
             String chunkString = sentence.getChunkStrings()[index];
@@ -158,7 +163,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
         int score = -1;
-        if (sentence.getSentiment()!=null && !sentence.getSentiment().equals("-")) {
+        if (sentence.getSentiment()!=null) { // && !sentence.getSentiment().equals("-")) {
           try {
             score = Integer.valueOf(sentence.getSentiment());
           } catch (NumberFormatException ex) {
@@ -169,7 +174,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-        String[] tokens = sentence.getWords();
+        List<String> tokens = sentence.getTokens();
         //String text = sentence.getSentence();
         //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
         int idx = -1;
@@ -255,32 +260,32 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     private Tag getTag(OpenNLPAnnotation.Sentence sentence, int tokenIdx, String lang) {
-      String pos = "-";
-      String ne  = "-";
-      String lemma = sentence.getWords()[tokenIdx];
+      List<String> pos = Arrays.asList(NLPDefaultValues.POS);
+      List<String> ne  = Arrays.asList(NLPDefaultValues.NE);
+      String lemma = sentence.getTokens().get(tokenIdx);
 
-      if (sentence.getPosTags()!=null) {
+      if (sentence.getTokenPosTags()!=null) {
         try {
-          if (sentence.getPosTags()[tokenIdx]!=null)
-            pos = sentence.getPosTags()[tokenIdx];
+          if (sentence.getTokenPosTags().get(tokenIdx)!=null)
+            pos = sentence.getTokenPosTags().get(tokenIdx);
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of POS tags.", tokenIdx);
         }
       }
 
-      if (sentence.getNamedEntities()!=null) {
+      if (sentence.getTokenNEs()!=null) {
         try {
-          if (sentence.getNamedEntities()[tokenIdx]!=null)
-            ne = sentence.getNamedEntities()[tokenIdx];
+          if (sentence.getTokenNEs().get(tokenIdx)!=null)
+            ne = sentence.getTokenNEs().get(tokenIdx);
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of named entities.", tokenIdx);
         }
       }
 
-      if (sentence.getLemmas()!=null) {
+      if (sentence.getTokenLemmas()!=null) {
         try {
-          if (!sentence.getLemmas()[tokenIdx].equals("O")) // "0" is default lemma value if there's no match with dictionary, in which case we want to keep the original word
-            lemma = sentence.getLemmas()[tokenIdx];
+          if (sentence.getTokenLemmas().get(tokenIdx)!=null && !sentence.getTokenLemmas().get(tokenIdx).equals(OpenNLPAnnotation.defaultLemmaOpenNLP))
+            lemma = sentence.getTokenLemmas().get(tokenIdx);
         } catch (ArrayIndexOutOfBoundsException ex) {
           LOG.error("Index %d not in array of lemmas.", tokenIdx);
         }
