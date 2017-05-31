@@ -100,16 +100,19 @@ RETURN l, result;
 ```
 
 **Format of training datasets:**
-  * `NER` - one sentence per line, one empty line between two different texts (paragraphs); there must be a space before and after each `<START:my_category>` and `<END>` statement; example for two new categories ("component" and "tool"):
+  * `NER`
+    * one sentence per line
+    * one empty line between two different texts (paragraphs)
+    * there must be a space before and after each `<START:my_category>` and `<END>` statement
+    * training data must not contain HTML symbols (such as `H<sub>2</sub>O`); **TO DO:** check whether text on which NER model is deployed needs to be manually deprived of HTML symbols or whether they are ignored automatically
+    Example for two new categories ("component" and "chemical"):
     ```
-    Implementing  <START:tool> remote-controlled pressure regulators <END>  and  <START:tool> digital pressure gauges <END>  in the designs of new systems would improve launch processing in future programs because they would prevent launch delays and provide for safer operations.
-    With the capability to adjust pressures remotely, crews would not have to be sent into the field during hazardous operations.
-    With  <START:tool> digital pressure gauges <END> , differences between local and remote pressure readings would be eliminated, and there would be no need to reconcile the differences.
+    <START:component> Space Shuttle Alkaline Fuel Cell Powerplants <END>  ( <START:component> FCPs <END> ) use <START:chemical> O2 <END> and <START:chemical> H2 <END> as reactants.
+    These  <START:component> FCPs <END>  require higher grade <START:chemical> LH2 <END> and <START:chemical> LO2 <END> (99.99% and 99.989% purity levels, respectively) than  <START:component> Space Shuttle Main Engines <END>  (99.9% <START:chemical> LH2 <END> and 99.2% <START:chemical> LO2 <END> ).
 
-    During the Space Shuttle STS-80 mission, the two planned Extravehicular Activities (EVA) were scrubbed when the astronauts discovered that the outer <START:component> airlock hatch <END> would not open.
-    This impacted the plan to evaluate the EVA tools that would be used for the construction and maintenance of the International Space Station.
-    Upon return from the mission, troubleshooting revealed that the  <START:component> airlock actuator <END>  that is used for latching and unlatching the hatch was defective.
-    This  <START:component> actuator <END>  was removed and replaced.
+    Residual <START:chemical> hydrogen <END> in the fill and drain line during the <START:event> terminal count down sequence <END>  could lead to a catastrophic failure.
+    The best practice is to connect the  <START:component> purge line <END>  to the  <START:component> propellant line <END>  as closely as possible to the dead headed end of the line to ensure complete purging on the line.
+    Residual <START:chemical> hydrogen <END> in certain locations in <START:component> feed systems <END>  for liquid propulsion can create potentially catastrophic conditions at launch.
     ```
   * `sentiment` - two columns separated by a white space (tab): the first column is a category as integer (0=VeryNegative, 1=Negative, 2=Neutral, 3=Positive, 4=VeryPositive), the second column is a sentence; example:
     ```
