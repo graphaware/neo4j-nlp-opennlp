@@ -121,4 +121,5 @@ RETURN l, result;
     ```
 
 **Validation:**
-Model validations are performed using OpenNLP cross-validation method. The validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.
+
+Model validations are performed using OpenNLP cross-validation method. The validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the sample size ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.

@@ -322,14 +322,10 @@ public class OpenNLPPipeline {
                         continue;
                       }
                       List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
+                      nameDetectors.get(key).clearAdaptiveData(); // should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
                       sentence.setNamedEntities(ners);
-                      /*
-                      Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
-                            .forEach(span -> {
-                                sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
-                                LOG.debug("NER type: " + span.getType());
-                            });*/
                     }
+
                     if (!this.globalProject.equals(DEFAULT_PROJECT_VALUE)) {
                       for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
                         if (!nameDetectors.containsKey(key)) {
@@ -339,14 +335,11 @@ public class OpenNLPPipeline {
                         if (key.split("-").length==0) continue;
                         if (!key.split("-")[0].equals(this.globalProject)) continue;
                         List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
+                        nameDetectors.get(key).clearAdaptiveData(); // should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
                         sentence.setNamedEntities(ners);
-                        /*Arrays.asList(nameDetectors.get(key).find(sentence.getWords())).stream()
-                              .forEach(span -> {
-                                  sentence.setNamedEntity(span.getStart(), span.getEnd(), span.getType());
-                                  LOG.info("Custom NER type: " + span.getType());
-                              });*/
                       }
                     }
+
                     sentence.finalizeNamedEntities();
                   } // ner
                   //else
