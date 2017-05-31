@@ -69,13 +69,13 @@ CALL ga.nlp.train({[project: "myXYProject",] alg: "NER", model: "component", fil
   * `file` is path to the training data file
   * `lang` (default is "en") specifies the language
   * **training parameters** are optional and defined in `com.graphaware.nlp.util.GenericModelParameters` and are not universal (some might be specific to only certain Text Processor):
-    * *trainerAlg* - specific for OpenNLP
-    * *trainerType* - specific for OpenNLP
     * *iter* - number of iterations
     * *cutoff* - useful for reducing the size of n-gram models, it's a threashold for n-gram occurrences/frequences in the training dataset
     * *threads* - provides support for multi-threading
     * *entityType* - name type to use for NER training, by default all entities (classes such as "Person", "Date", ...) present in provided training file are used
     * *nFolds* - parameter for cross-validation procedure (default is 10), see paragraph *Validation*
+    * *trainerAlg* - specific for OpenNLP
+    * *trainerType* - specific for OpenNLP
 
 The trained model is saved to a binary file in Neo4j's `import/` directory with name format: `<lang>-<alg>-<model>-<project>.bin`. Each time Neo4j starts, this directory is scanned for files (models) in this format, i.e. you don't need to train the same model again when you restart Neo4j.
   * `NER` - default models (Person, Location, Organization, Date, Time, Money, Percentage) plus all registered customized models (assigned to specified `project`) are used when invoking `ga.nlp.annotate()` (see example below)
