@@ -61,7 +61,7 @@ public class OpenNLPAnnotation {
         private Span[] chunks;
         private String[] chunkStrings;
         private String[] chunkSentiments;
-        private final String defaultStringValue = "-";
+        private final String defaultStringValue = "-"; // @Deprecated
 
         public Sentence(Span sentence, String text) {
             this.sentence = sentence;

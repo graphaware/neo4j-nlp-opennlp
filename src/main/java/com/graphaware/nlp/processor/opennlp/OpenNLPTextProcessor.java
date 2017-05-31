@@ -21,6 +21,7 @@ import com.graphaware.nlp.domain.Phrase;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
 import com.graphaware.nlp.domain.NLPDefaultValues;
+import com.graphaware.nlp.util.OptionalNLPParameters;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,10 +41,12 @@ import org.slf4j.LoggerFactory;
 public class OpenNLPTextProcessor implements TextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
-    public static final String TOKENIZER = "tokenizer";
-    public static final String SENTIMENT = "sentiment";
-    public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
-    public static final String PHRASE = "phrase";
+    private static final String TOKENIZER = "tokenizer";
+    private static final String SENTIMENT = "sentiment";
+    private static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
+    private static final String PHRASE = "phrase";
+
+    private static final double DEFAULT_SENTIMENT_PROBTHR = 0.7;
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
     private final Pattern patternCheck;
@@ -91,7 +94,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .defaultStopWordAnnotator()
-                //.extractCoref()
                 .extractRelations()
                 .extractSentiment()
                 .threadNumber(6)
@@ -115,11 +117,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
             default:
                 pipeline = TOKENIZER;
         }
-        return annotateText(text, id, pipeline, lang, store, "");
+        return annotateText(text, id, pipeline, lang, store, null);
     }
 
     @Override
-    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, String project) {
+    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, Map<String, String> otherParams) {
         if (name.length()==0) {
           name = TOKENIZER;
           LOG.info("Using default pipeline: " + name);
@@ -127,8 +129,16 @@ public class OpenNLPTextProcessor implements TextProcessor {
         OpenNLPPipeline pipeline = pipelines.get(name);
         if (pipeline==null)
           throw new RuntimeException("Pipeline: " + name + " doesn't exist");
+        double sentProbThr = DEFAULT_SENTIMENT_PROBTHR;
+        String project = null;
+        if (otherParams!=null) {
+          if (otherParams.containsKey(OptionalNLPParameters.SENTIMENT_PROB_THR))
+            sentProbThr = Double.parseDouble(otherParams.get(OptionalNLPParameters.SENTIMENT_PROB_THR));
+          project = otherParams.getOrDefault(OptionalNLPParameters.CUSTOM_PROJECT, null);
+        }
+
         pipeline.reset();
-        pipeline.useTheseCustomModels(project);
+        pipeline.useTheseCustomParameters(project, sentProbThr);
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipeline.annotate(document);
         LOG.info("Annotation for id " + id + " finished.");
@@ -154,10 +164,10 @@ public class OpenNLPTextProcessor implements TextProcessor {
           LOG.warn("extractPhrases(): phrases index empty, aborting extraction");
           return;
         }
-        sentence.getPhrasesIndex().forEach((index) -> {
+        sentence.getPhrasesIndex().forEach(index -> {
             Span chunk = sentence.getChunks()[index];
             String chunkString = sentence.getChunkStrings()[index];
-            newSentence.addPhraseOccurrence(chunk.getStart(), chunk.getEnd(), new Phrase(chunkString));
+            newSentence.addPhraseOccurrence(chunk.getStart(), chunk.getEnd(), new Phrase(chunkString, chunk.getType()));
         });
     }
 
@@ -322,13 +332,21 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     @Override
-    public AnnotatedText sentiment(AnnotatedText annotated, String project) {
+    public AnnotatedText sentiment(AnnotatedText annotated, Map<String, String> otherParams) {
         OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
         if (pipeline==null) {
           throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
         }
+        double sentProbThr = DEFAULT_SENTIMENT_PROBTHR;
+        String project = null;
+        if (otherParams!=null) {
+          if (otherParams.containsKey(OptionalNLPParameters.SENTIMENT_PROB_THR))
+            sentProbThr = Double.parseDouble(otherParams.get(OptionalNLPParameters.SENTIMENT_PROB_THR));
+          project = otherParams.getOrDefault(OptionalNLPParameters.CUSTOM_PROJECT, null);
+        }
+
         pipeline.reset();
-        pipeline.useTheseCustomModels(project);
+        pipeline.useTheseCustomParameters(project, sentProbThr);
         annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
             OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
             pipeline.annotate(document);
@@ -338,6 +356,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
               extractSentiment(sentence.get(), item);
             }
         });
+
         return annotated;
     }
 

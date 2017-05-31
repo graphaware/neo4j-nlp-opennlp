@@ -40,6 +40,11 @@ MERGE (n)-[:HAS_ANNOTATED_TEXT]->(result)
 RETURN n, result
 ```
 
+Available parameters are:
+  * the same ones as described in <a href="https://github.com/graphaware/neo4j-nlp" target="_blank">parent class GraphAware NLP</a>
+  * `sentimentProbabilityThr` (optional, default *0.7*): if assigned sentiment label has confidence smaller thank this threshold, set sentiment to *Neutral*
+  * `customProject` (optional): add user trained/provided models associated with specified project, see paragraph *Customizing pipeline models*
+
 Available pipelines:
   * `tokenizer` - tokenization, lemmatization, stop-words removal, part-of-speach tagging (POS), named entity recognition (NER)
   * `sentiment` - tokenization, sentiment analysis
@@ -47,7 +52,7 @@ Available pipelines:
   * `phrase` (not supported yet) - tokenization, stop-words removal, relations, sentiment analysis
 
 ### Sentiment Analysis
-The current implementation of a sentiment analysis is just a toy - it relies on a file with 100 labeled twitter samples which are used to build a model when Neo4j starts (general recommendation for number of training samples is 10k and more). The current model supports only three options - Positive, Neutral, Negative - which are chosen based on the highest probability (the algorithm returns an array of probabilities for each category). If the highest probability is less then 70% (can easily happen in case of more than 2 categories), the category is not regarded trustworthy and is set to Neutral instead.
+The current implementation of a sentiment analysis is just a toy - it relies on a file with 100 labeled twitter samples which are used to build a model when Neo4j starts (general recommendation for number of training samples is 10k and more). The current model supports only three options - Positive, Neutral, Negative - which are chosen based on the highest probability (the algorithm returns an array of probabilities for each category). If the highest probability is less then 70% (default value which can be customized by using parameter *sentimentProbabilityThr*), the category is not regarded trustworthy and is set to Neutral instead.
 
 The sentiment analysis can be run either as part of the annotation (see paragraph above) or as an independent procedure (see command below) which takes in AnnotatedText nodes, analyzes all attached sentences and adds to them a label corresponding to its sentiment.
 

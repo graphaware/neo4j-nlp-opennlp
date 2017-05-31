@@ -52,57 +52,60 @@ import org.slf4j.LoggerFactory;
  */
 public class OpenNLPPipeline {
 
-    public static final String PROPERTY_PATH_CHUNKER_MODEL = "chuncker";
-    public static final String PROPERTY_PATH_POS_TAGGER_MODEL = "pos";
-    public static final String PROPERTY_PATH_SENTENCE_MODEL = "sentence";
-    public static final String PROPERTY_PATH_TOKENIZER_MODEL = "tokenizer";
-    public static final String PROPERTY_PATH_LEMMATIZER_MODEL = "lemmatizer";
-    public static final String PROPERTY_PATH_SENTIMENT_MODEL = "sentiment";
+    protected static final String PROPERTY_PATH_CHUNKER_MODEL = "chuncker";
+    protected static final String PROPERTY_PATH_POS_TAGGER_MODEL = "pos";
+    protected static final String PROPERTY_PATH_SENTENCE_MODEL = "sentence";
+    protected static final String PROPERTY_PATH_TOKENIZER_MODEL = "tokenizer";
+    protected static final String PROPERTY_PATH_LEMMATIZER_MODEL = "lemmatizer";
+    protected static final String PROPERTY_PATH_SENTIMENT_MODEL = "sentiment";
 
-    public static final String PROPERTY_DEFAULT_CHUNKER_MODEL = "en-chunker.bin";
-    public static final String PROPERTY_DEFAULT_POS_TAGGER_MODEL = "en-pos-maxent.bin";
-    public static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
-    public static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
-    public static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
-    public static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "en-sentiment-tweets_toy.bin";
+    protected static final String PROPERTY_DEFAULT_CHUNKER_MODEL = "en-chunker.bin";
+    protected static final String PROPERTY_DEFAULT_POS_TAGGER_MODEL = "en-pos-maxent.bin";
+    protected static final String PROPERTY_DEFAULT_SENTENCE_MODEL = "en-sent.bin";
+    protected static final String PROPERTY_DEFAULT_TOKENIZER_MODEL = "en-token.bin";
+    protected static final String PROPERTY_DEFAULT_LEMMATIZER_MODEL = "en-lemmatizer.dict";
+    protected static final String PROPERTY_DEFAULT_SENTIMENT_MODEL = "en-sentiment-tweets_toy.bin";
 
-    public static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";
-    public static final String DEFAULT_PROJECT_VALUE = "default";
+    protected static final String PROPERTY_DEFAULT_SENTIMENT_TRAIN = "sentiment_tweets.train";
+    protected static final String DEFAULT_PROJECT_VALUE = "default";
+    protected double sentimentProbabilityThr;
+    protected double DEFAULT_SENTIMENT_PROBTHR = 0.;
 
     // Named Entities: mapping from labels to models
-    public static HashMap<String, String> PROPERTY_NE_MODELS;
+    protected static HashMap<String, String> PROPERTY_NE_MODELS;
 
     // Custom models related: key vs file path
-    private String globalProject;
-    public static HashMap<String, String> CUSTOM_PROPERTY_NE_MODELS;
-    public static HashMap<String, String> CUSTOM_PROPERTY_SENTIMENT_MODELS;
+    protected String globalProject;
+    protected static HashMap<String, String> CUSTOM_PROPERTY_NE_MODELS;
+    protected static HashMap<String, String> CUSTOM_PROPERTY_SENTIMENT_MODELS;
 
     // Named Entities: mapping from labels to identifiers that are used in the graph
     //public static HashMap<String, String> PROPERTY_NE_IDS = new HashMap<String, String>();
 
     // Named Entities: objects
-    public HashMap<String, NameFinderME> nameDetectors;
+    protected HashMap<String, NameFinderME> nameDetectors;
 
-    public final List<String> annotators;
-    public final List<String> stopWords;
+    protected final List<String> annotators;
+    protected final List<String> stopWords;
 
-    private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
-    private TokenizerME wordBreaker;
-    private POSTaggerME posme;
-    private ChunkerME chunkerME;
-    private SentenceDetectorME sentenceDetector;
-    //private LemmatizerME lemmaDetector;
-    private DictionaryLemmatizer lemmaDetector; // needs OpenNLP >=1.7
-    //private SimpleLemmatizer lemmaDetector; // for OpenNLP < 1.7
+    protected TokenizerME wordBreaker;
+    protected POSTaggerME posme;
+    protected ChunkerME chunkerME;
+    protected SentenceDetectorME sentenceDetector;
+    //protected LemmatizerME lemmaDetector;
+    protected DictionaryLemmatizer lemmaDetector; // needs OpenNLP >=1.7
+    //protected SimpleLemmatizer lemmaDetector; // for OpenNLP < 1.7
 
     // Sentiment Analysis: objects
-    private DocumentCategorizerME sentimentDetector;
-    public HashMap<String, DocumentCategorizerME> sentimentDetectors;
+    protected DocumentCategorizerME sentimentDetector;
+    protected HashMap<String, DocumentCategorizerME> sentimentDetectors;
 
 
     public OpenNLPPipeline(Properties properties) {
         this.globalProject = DEFAULT_PROJECT_VALUE;
+        this.sentimentProbabilityThr = DEFAULT_SENTIMENT_PROBTHR;
 
         // Named Entities: mapping from labels to models
         PROPERTY_NE_MODELS = new HashMap<String, String>();
@@ -127,7 +130,7 @@ public class OpenNLPPipeline {
         init(properties);
     }
 
-    private void init(Properties properties) {
+    protected void init(Properties properties) {
         try {
             senteceSplitter(properties);
             tokenizer(properties);
@@ -150,28 +153,28 @@ public class OpenNLPPipeline {
         chunkerME = new ChunkerME(chunkerModel);
     }
 
-    private void posTagger(Properties properties) throws FileNotFoundException {
+    protected void posTagger(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_POS_TAGGER_MODEL, PROPERTY_DEFAULT_POS_TAGGER_MODEL);
         POSModel pm = loadModel(POSModel.class, is);
         closeInputStream(is, PROPERTY_PATH_POS_TAGGER_MODEL);
         posme = new POSTaggerME(pm);
     }
 
-    private void tokenizer(Properties properties) throws FileNotFoundException {
+    protected void tokenizer(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_TOKENIZER_MODEL, PROPERTY_DEFAULT_TOKENIZER_MODEL);
         TokenizerModel tm = loadModel(TokenizerModel.class, is);
         closeInputStream(is, PROPERTY_PATH_TOKENIZER_MODEL);
         wordBreaker = new TokenizerME(tm);
     }
 
-    private void senteceSplitter(Properties properties) throws FileNotFoundException {
+    protected void senteceSplitter(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_SENTENCE_MODEL, PROPERTY_DEFAULT_SENTENCE_MODEL);
         SentenceModel sentenceModel = loadModel(SentenceModel.class, is);
         closeInputStream(is, PROPERTY_PATH_SENTENCE_MODEL);
         sentenceDetector = new SentenceDetectorME(sentenceModel);
     }
 
-    private void namedEntitiesFinders(Properties properties) throws FileNotFoundException {
+    protected void namedEntitiesFinders(Properties properties) throws FileNotFoundException {
         // Default NE models
         for (String key : PROPERTY_NE_MODELS.keySet()) {
           InputStream is = getInputStream(properties, key, PROPERTY_NE_MODELS.get(key));
@@ -191,7 +194,7 @@ public class OpenNLPPipeline {
         }
     }
 
-    private void lemmatizer(Properties properties) throws FileNotFoundException {
+    protected void lemmatizer(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_LEMMATIZER_MODEL, PROPERTY_DEFAULT_LEMMATIZER_MODEL);
         //LemmatizerModel lemmaModel = loadModel(LemmatizerModel.class, is);
         lemmaDetector = new DictionaryLemmatizer(is); // needs OpenNLP >=1.7
@@ -200,7 +203,7 @@ public class OpenNLPPipeline {
         //lemmaDetector = new LemmatizerME(lemmaModel);
     }
 
-    private void categorizer(Properties properties) throws FileNotFoundException {
+    protected void categorizer(Properties properties) throws FileNotFoundException {
         // first a default model
         InputStream is = getInputStream(properties, PROPERTY_PATH_SENTIMENT_MODEL, PROPERTY_DEFAULT_SENTIMENT_MODEL);
         if (is!=null) {
@@ -282,17 +285,18 @@ public class OpenNLPPipeline {
                       // Chunking
                       Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
                       sentence.setChunks(chunks);
+                      LOG.info("Found " + chunks.length + " phrases.");
                       String[] chunkStrings = Span.spansToStrings(chunks, sentence.getWords());
                       sentence.setChunkStrings(chunkStrings);
                       List<String> chunkSentiments = new ArrayList<String>();
-                      for (int i = 0; i < chunks.length; i++) {
+                      for (int i=0; i<chunks.length; i++) {
                         //if (chunks[i].getType().equals("NP"))
                             sentence.addPhraseIndex(i);
-                        // run sentiment analysis on chunks? (would be needed to ensure only chunks with >=2 words are used)
+                        // run sentiment analysis on chunks? (would be needed to ensure that only chunks with >=2 words are used)
                         /*if (annotators.contains("sentiment")) {
                           double[] outcomes = sentimentDetector.categorize(chunkStrings[i]);
                           String category = sentimentDetector.getBestCategory(outcomes);
-                          if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
+                          if (Arrays.stream(outcomes).max().getAsDouble()<this.sentimentProbabilityThr)
                             category = "2"; // not conclusive, setting it to "Neutral"
                           chunkSentiments.add(category);
                           LOG.info("Sentence: " + chunkStrings[i] + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
@@ -352,15 +356,15 @@ public class OpenNLPPipeline {
                 if (annotators.contains("sentiment") && sentimentDetector!=null) {
                   double[] outcomes = sentimentDetector.categorize(sentence.getSentence());
                   String category = sentimentDetector.getBestCategory(outcomes);
-                  if (Arrays.stream(outcomes).max().getAsDouble()<0.7)
+                  if (Arrays.stream(outcomes).max().getAsDouble()<this.sentimentProbabilityThr)
                     category = "2"; // not conclusive, setting it to "Neutral"
                   sentence.setSentiment(category);
                   LOG.info("Sentiment results: sentence = " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
                 }
             });
         } catch (Exception ex) {
-            LOG.error("Error processing sentence for phrase: " + text, ex);
-            throw new RuntimeException("Error processing sentence for phrase: " + text, ex);
+            LOG.error("Error processing sentence for text: " + text, ex);
+            throw new RuntimeException("Error processing sentence for text: " + text, ex);
         }
     }
 
@@ -414,7 +418,8 @@ public class OpenNLPPipeline {
       updateProjectValue(DEFAULT_PROJECT_VALUE);
     }
 
-    public void useTheseCustomModels(String project) {
+    public void useTheseCustomParameters(String project, double sentProbThr) {
+      this.sentimentProbabilityThr = sentProbThr;
       if (project==null) {
         //updateProjectValue(DEFAULT_PROJECT_VALUE);
         return;
