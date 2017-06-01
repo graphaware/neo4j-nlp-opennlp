@@ -42,7 +42,7 @@ RETURN n, result
 
 Available parameters are:
   * the same ones as described in <a href="https://github.com/graphaware/neo4j-nlp" target="_blank">parent class GraphAware NLP</a>
-  * `sentimentProbabilityThr` (optional, default *0.7*): if assigned sentiment label has confidence smaller thank this threshold, set sentiment to *Neutral*
+  * `sentimentProbabilityThr` (optional, default *0.7*): if assigned sentiment label has confidence smaller than this threshold, set sentiment to *Neutral*
   * `customProject` (optional): add user trained/provided models associated with specified project, see paragraph *Customizing pipeline models*
 
 Available pipelines:
