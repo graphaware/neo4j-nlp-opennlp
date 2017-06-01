@@ -105,7 +105,7 @@ RETURN l, result;
     * one empty line between two different texts (paragraphs)
     * there must be a space before and after each `<START:my_category>` and `<END>` statement
     * training data must not contain HTML symbols (such as `H<sub>2</sub>O`); **TO DO:** check whether text on which NER model is deployed needs to be manually deprived of HTML symbols or whether they are ignored automatically
-    Example for two new categories ("component" and "chemical"):
+    * Example for two new categories ("component" and "chemical"):
     ```
     <START:component> Space Shuttle Alkaline Fuel Cell Powerplants <END>  ( <START:component> FCPs <END> ) use <START:chemical> O2 <END> and <START:chemical> H2 <END> as reactants.
     These  <START:component> FCPs <END>  require higher grade <START:chemical> LH2 <END> and <START:chemical> LO2 <END> (99.99% and 99.989% purity levels, respectively) than  <START:component> Space Shuttle Main Engines <END>  (99.9% <START:chemical> LH2 <END> and 99.2% <START:chemical> LO2 <END> ).
