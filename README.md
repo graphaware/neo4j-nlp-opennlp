@@ -73,6 +73,7 @@ CALL ga.nlp.train({[project: "myXYProject",] alg: "NER", model: "component", fil
   * `model` arbitrary string that provides, in combination with `alg` (and with `project` if it's specified), a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
   * `file` is path to the training data file
   * `lang` (default is "en") specifies the language
+  * `textProcessor` (optional) - for details see description in parent package (*neo4j-nlp*)
   * **training parameters** are optional and defined in `com.graphaware.nlp.util.GenericModelParameters` and are not universal (some might be specific to only certain Text Processor):
     * *iter* - number of iterations
     * *cutoff* - useful for reducing the size of n-gram models, it's a threashold for n-gram occurrences/frequences in the training dataset
