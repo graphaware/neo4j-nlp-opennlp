@@ -55,9 +55,11 @@ public class OpenNLPPipelineTest {
         
         document.getSentences().forEach((sentence) -> {
             System.out.println(">>>" + sentence.getSentence());
-            sentence.getPhrasesIndex().forEach((phrase) -> {
-                System.out.println(">>>" + sentence.getChunkStrings()[phrase]);
-            });
+            if (sentence.getPhrasesIndex()!=null) {
+              sentence.getPhrasesIndex().forEach((phrase) -> {
+                  System.out.println(">>>" + sentence.getChunkStrings()[phrase]);
+              });
+            }
         });
     }
 
