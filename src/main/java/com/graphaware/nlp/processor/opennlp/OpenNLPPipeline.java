@@ -333,6 +333,7 @@ public class OpenNLPPipeline {
                         }
                         if (key.split("-").length==0) continue;
                         if (!key.split("-")[0].equals(this.globalProject)) continue;
+                        LOG.debug("Running custom NER for project " + this.globalProject + ": " + key);
                         List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
                         sentence.setNamedEntities(ners);
                       }
@@ -437,15 +438,16 @@ public class OpenNLPPipeline {
     }
 
     private void updateProjectValue(String project) {
+      LOG.info("Using models from project " + project);
       this.globalProject = project.toLowerCase();
 
       if (sentimentDetectors.containsKey(this.globalProject)) {
-        LOG.info("Switching to a sentiment model: " + this.globalProject);
+        //LOG.info("Switching to a sentiment model: " + this.globalProject);
+        sentimentDetector = sentimentDetectors.get(this.globalProject);
       } else {
-        LOG.warn("Required sentiment model (" + this.globalProject + ") doesn't exist, setting it to the default.");
-        this.globalProject = DEFAULT_PROJECT_VALUE;
+        LOG.info("Required sentiment model (" + this.globalProject + ") doesn't exist, setting it to the default.");
+        sentimentDetector = sentimentDetectors.get(DEFAULT_PROJECT_VALUE);
       }
-      sentimentDetector = sentimentDetectors.get(this.globalProject);
     }
 
     private void findModelFiles(String path) {
