@@ -322,7 +322,6 @@ public class OpenNLPPipeline {
                         continue;
                       }
                       List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
-                      nameDetectors.get(key).clearAdaptiveData(); // should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
                       sentence.setNamedEntities(ners);
                     }
 
@@ -335,7 +334,6 @@ public class OpenNLPPipeline {
                         if (key.split("-").length==0) continue;
                         if (!key.split("-")[0].equals(this.globalProject)) continue;
                         List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
-                        nameDetectors.get(key).clearAdaptiveData(); // should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
                         sentence.setNamedEntities(ners);
                       }
                     }
@@ -355,6 +353,20 @@ public class OpenNLPPipeline {
                   LOG.info("Sentiment results: sentence = " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
                 }
             });
+
+          // clearAdaptiveData() should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
+          if (annotators.contains("ner")) {
+            for (String key : PROPERTY_NE_MODELS.keySet()) {
+              if (nameDetectors.containsKey(key))
+                nameDetectors.get(key).clearAdaptiveData();
+            }
+            if (!this.globalProject.equals(DEFAULT_PROJECT_VALUE)) {
+              for (String key : CUSTOM_PROPERTY_NE_MODELS.keySet()) {
+                if (nameDetectors.containsKey(key))
+                  nameDetectors.get(key).clearAdaptiveData();
+              }
+            }
+          }
         } catch (Exception ex) {
             LOG.error("Error processing sentence for text: " + text, ex);
             throw new RuntimeException("Error processing sentence for text: " + text, ex);
