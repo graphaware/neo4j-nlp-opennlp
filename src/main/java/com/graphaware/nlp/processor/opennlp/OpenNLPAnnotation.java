@@ -276,7 +276,10 @@ public class OpenNLPAnnotation {
               this.tokenSpans.add(ne);
               this.tokenLemmas.add(lemma);
               this.tokenPOS.add(posL);
-              this.tokenNEs.add(Arrays.asList(ne.getType()));
+
+              List<String> neL = new ArrayList();
+              neL.add(ne.getType());
+              this.tokenNEs.add(neL);
             }
           });
         }

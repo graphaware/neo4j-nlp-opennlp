@@ -333,7 +333,7 @@ public class OpenNLPPipeline {
                         }
                         if (key.split("-").length==0) continue;
                         if (!key.split("-")[0].equals(this.globalProject)) continue;
-                        LOG.debug("Running custom NER for project " + this.globalProject + ": " + key);
+                        LOG.info("Running custom NER for project " + this.globalProject + ": " + key);
                         List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
                         sentence.setNamedEntities(ners);
                       }
