@@ -25,6 +25,8 @@ import opennlp.tools.doccat.DocumentSample;
 import opennlp.tools.doccat.DocumentSampleStream;
 import opennlp.tools.doccat.DocumentCategorizerME;
 import opennlp.tools.doccat.DoccatCrossValidator;
+import opennlp.tools.doccat.DocumentCategorizerEvaluator;
+import opennlp.tools.doccat.DoccatModel;
 
 import opennlp.tools.namefind.NameSample;
 
@@ -89,18 +91,42 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
   public String validate() {
     LOG.info("Starting validation of " + this.myName + " ...");
     String result = "";
-    try {
-      if (this.sampleStream==null)
-        this.sampleStream = new DocumentSampleStream(this.lineStream);
-      DoccatCrossValidator evaluator = new DoccatCrossValidator(this.lang, this.trainParams, new DoccatFactory(), null);
-      // the second argument of 'evaluate()' gives number of folds (n): number of times the training-testing will be run (with data splitting train:test = (n-1):1)
-      evaluator.evaluate(this.sampleStream, this.nFolds);
-      result = "Accuracy = " + this.decFormat.format(evaluator.getDocumentAccuracy());
-      LOG.info("Validation: " + result);
-    } catch (Exception ex) {
-      LOG.error("Error while validating " + this.myName + " model.");
-      ex.printStackTrace();
+    if (this.fileValidate==null) {
+      try {
+        if (this.sampleStream==null)
+          this.sampleStream = new DocumentSampleStream(this.lineStream);
+        DoccatCrossValidator evaluator = new DoccatCrossValidator(this.lang, this.trainParams, new DoccatFactory(), null);
+        // the second argument of 'evaluate()' gives number of folds (n): number of times the training-testing will be run (with data splitting train:test = (n-1):1)
+        evaluator.evaluate(this.sampleStream, this.nFolds);
+        result = "Accuracy = " + this.decFormat.format(evaluator.getDocumentAccuracy());
+        LOG.info("Validation: " + result);
+      } catch (Exception ex) {
+        LOG.error("Error while validating " + this.myName + " model.");
+        ex.printStackTrace();
+      }
     }
+    else {
+      // Using a separate .test file provided by user
+      ObjectStream<DocumentSample> sampleStreamValidate = null;
+      try {
+        sampleStreamValidate = new DocumentSampleStream(this.lineStreamValidate);
+        DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(new DocumentCategorizerME((DoccatModel)this.model));
+        evaluator.evaluate(sampleStreamValidate);
+        result = "Accuracy = " + this.decFormat.format(evaluator.getAccuracy());
+        LOG.info("Validation: " + result);
+      } catch (Exception ex) {
+        LOG.error("Error while validating " + this.myName + " model.");
+        ex.printStackTrace();
+      }
+
+      try {
+        if (sampleStreamValidate!=null)
+          sampleStreamValidate.close();
+      } catch (IOException ex) {
+        LOG.warn("Attempt to close validation sample-stream(s) failed.");
+      }
+    }
+
     return result;
   }
 
@@ -111,7 +137,7 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     } catch (IOException ex) {
       LOG.warn("Attempt to close sample-stream from source file " + this.fileIn + " failed.");
     }
-    this.closeInputFile();
+    this.closeInputFiles();
   }
 
 }

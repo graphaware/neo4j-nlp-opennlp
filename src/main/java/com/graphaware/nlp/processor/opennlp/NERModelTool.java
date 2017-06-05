@@ -20,6 +20,7 @@ import opennlp.tools.namefind.TokenNameFinderEvaluator;
 import opennlp.tools.namefind.NameSample;
 import opennlp.tools.namefind.NameFinderME;
 import opennlp.tools.namefind.NameSampleDataStream;
+import opennlp.tools.namefind.TokenNameFinderModel;
 
 import opennlp.tools.util.PlainTextByLineStream;
 import opennlp.tools.util.ObjectStream;
@@ -73,49 +74,59 @@ public class NERModelTool extends OpenNLPGenericModelTool {
   public String validate() {
     LOG.info("Starting validation of " + this.myName + " ...");
     String result = "";
-    //List<EvaluationMonitor<NameSample>> listeners = new LinkedList<EvaluationMonitor<NameSample>>();
-    try {
-      if (this.sampleStream==null)
-        this.sampleStream = new NameSampleDataStream(this.lineStream);
-      // #1 Using CrossValidator
-      TokenNameFinderCrossValidator evaluator = new TokenNameFinderCrossValidator(this.lang, this.entityType, this.trainParams, null, null, null);
-      // the second argument of 'evaluate()' gives number of folds (n), i.e. number of times the training-testing will be run (with data splitting train:test = (n-1):1)
-      evaluator.evaluate(this.sampleStream, this.nFolds);
-      result = "F = " + this.decFormat.format(evaluator.getFMeasure().getFMeasure()) 
-                    + " (Precision = " + this.decFormat.format(evaluator.getFMeasure().getPrecisionScore())
-                    + ", Recall = " + this.decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
-      LOG.info("Validation: " + result);
-    } catch (Exception ex) {
-      LOG.error("Error while validating " + this.myName + " model.");
-      ex.printStackTrace();
+    if (this.fileValidate==null) {
+      //List<EvaluationMonitor<NameSample>> listeners = new LinkedList<EvaluationMonitor<NameSample>>();
+      try {
+        if (this.sampleStream==null)
+          this.sampleStream = new NameSampleDataStream(this.lineStream);
+        // Using CrossValidator
+        TokenNameFinderCrossValidator evaluator = new TokenNameFinderCrossValidator(this.lang, this.entityType, this.trainParams, null, null, null);
+        // the second argument of 'evaluate()' gives number of folds (n), i.e. number of times the training-testing will be run (with data splitting train:test = (n-1):1)
+        evaluator.evaluate(this.sampleStream, this.nFolds);
+        result = "F = " + this.decFormat.format(evaluator.getFMeasure().getFMeasure()) 
+                      + " (Precision = " + this.decFormat.format(evaluator.getFMeasure().getPrecisionScore())
+                      + ", Recall = " + this.decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
+        LOG.info("Validation: " + result);
+      } catch (Exception ex) {
+        LOG.error("Error while validating " + this.myName + " model.");
+        ex.printStackTrace();
+      }
+    }
+    else {
+      // Using a separate .test file provided by user
+      ObjectStream<NameSample> sampleStreamValidate = null;
+      try {
+        sampleStreamValidate = new NameSampleDataStream(this.lineStreamValidate);
+        TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(new NameFinderME((TokenNameFinderModel)this.model));
+        evaluator.evaluate(sampleStreamValidate);
+        result = "F = " + this.decFormat.format(evaluator.getFMeasure().getFMeasure())
+                      + " (Precision = " + this.decFormat.format(evaluator.getFMeasure().getPrecisionScore())
+                      + ", Recall = " + this.decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
+        LOG.info("Validation: " + result);
+      } catch (Exception ex) {
+        LOG.error("Error while validating " + this.myName + " model.");
+        ex.printStackTrace();
+      }
+
+      try {
+        if (sampleStreamValidate!=null)
+          sampleStreamValidate.close();
+      } catch (IOException ex) {
+        LOG.warn("Attempt to close validation sample-stream(s) failed.");
+      }
     }
 
-    // #2 Splitting training file into train and test manually
-
-
-    // #3 Using a separate .test file provided by user
-    /*try {
-      ImprovisedInputStreamFactory testdataIn = new ImprovisedInputStreamFactory(null, "", fileTest);
-      ObjectStream<String> testlineStream = new PlainTextByLineStream(testdataIn, "UTF-8");
-      ObjectStream<NameSample> testsampleStream = new NameSampleDataStream(testlineStream);
-      TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(new NameFinderME(model));
-      evaluator.evaluate(testsampleStream);
-      LOG.info("Validation: F = " + evaluator.getFMeasure().getFMeasure() + " (Precision = " + evaluator.getFMeasure().getPrecisionScore() + ", Recall = " + evaluator.getFMeasure().getRecallScore() + ")");
-      } catch (Exception ex) {
-      LOG.error("Error while validating " + alg, ex);
-      ex.printStackTrace();
-    }*/
     return result;
   }
 
   public void close() {
     try {
-      if (sampleStream!=null)
-        sampleStream.close();
+      if (this.sampleStream!=null)
+        this.sampleStream.close();
     } catch (IOException ex) {
-      LOG.warn("Attempt to close sample-stream from source file " + this.fileIn + " failed.");
+      LOG.warn("Attempt to close training sample-stream(s) failed.");
     }
-    this.closeInputFile();
+    this.closeInputFiles();
   }
 
 }

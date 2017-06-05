@@ -35,23 +35,28 @@ public class OpenNLPGenericModelTool {
   protected BaseModel model;
   protected TrainingParameters trainParams;
   protected final String modelDescr;
-  protected final String fileIn;
-  protected ObjectStream<String> lineStream;
   protected final DecimalFormat decFormat;
   protected int nFolds;
+
+  protected final String fileIn;
+  protected ObjectStream<String> lineStream;
+  protected String fileValidate;
+  protected ObjectStream<String> lineStreamValidate;
 
   private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
 
   public OpenNLPGenericModelTool(String file, String modelDescr) {
     this.model = null;
+    this.fileValidate = null;
     this.nFolds = 10;
     this.fileIn = file;
     this.modelDescr = modelDescr;
     this.decFormat = new DecimalFormat("#0.00"); // for formating validation results with precision 2 decimals
 
     this.setDefParams();
-    this.openFile();
+    this.lineStream = this.openFile(this.fileIn);
+    this.lineStreamValidate = this.openFile(this.fileValidate);
   }
 
   public OpenNLPGenericModelTool(String file, String modelDescr, Map<String, String> params) {
@@ -64,17 +69,19 @@ public class OpenNLPGenericModelTool {
     this.trainParams = TrainingParameters.defaultParams();
   }
 
-  private void openFile() {
+  private ObjectStream<String> openFile(String fileName) {
+    if (fileName==null)
+      return null;
     //ImprovisedInputStreamFactory dataIn = null;
-    this.lineStream = null;
+    ObjectStream<String> lStream = null;
     try {
-      ImprovisedInputStreamFactory dataIn = new ImprovisedInputStreamFactory(null, "", this.fileIn);
-      this.lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
+      ImprovisedInputStreamFactory dataIn = new ImprovisedInputStreamFactory(null, "", fileName);
+      lStream = new PlainTextByLineStream(dataIn, "UTF-8");
     } catch (IOException ex) {
-      LOG.error("Failure while opening file " + this.fileIn, ex);
-      throw new RuntimeException("Failure while opening file " + this.fileIn, ex);
+      LOG.error("Failure while opening file " + fileName, ex);
+      throw new RuntimeException("Failure while opening file " + fileName, ex);
     }
-    return;
+    return lStream;
   }
 
   protected void setTrainingParameters(Map<String, String> params) {
@@ -102,7 +109,7 @@ public class OpenNLPGenericModelTool {
     }
     if (params.containsKey(GenericModelParameters.TRAIN_THREADS)) {
       this.trainParams.put(TrainingParameters.THREADS_PARAM, params.get(GenericModelParameters.TRAIN_THREADS));
-      LOG.info("Training parameter ", TrainingParameters.THREADS_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_THREADS));
+      LOG.info("Training parameter " + TrainingParameters.THREADS_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_THREADS));
     }
     if (params.containsKey(GenericModelParameters.VALIDATE_FOLDS)) {
       try {
@@ -112,14 +119,25 @@ public class OpenNLPGenericModelTool {
       }
       LOG.info("n-folds for crossvalidation set to %d.", this.nFolds);
     }
+    if (params.containsKey(GenericModelParameters.VALIDATE_FILE)) {
+      this.fileValidate = (String) params.get(GenericModelParameters.VALIDATE_FILE);
+      LOG.info("Using valudation file " + params.get(GenericModelParameters.VALIDATE_FILE));
+    }
   }
 
-  protected void closeInputFile() {
+  protected void closeInputFiles() {
     try {
       if (this.lineStream!=null)
         this.lineStream.close();
     } catch (IOException ex) {
       LOG.warn("Attept to close input line-stream from source file " + this.fileIn + " failed.");
+    }
+
+    try {
+      if (this.lineStreamValidate!=null)
+        this.lineStreamValidate.close();
+    } catch (IOException ex) {
+      LOG.warn("Attept to close input line-stream from source file " + this.fileValidate + " failed.");
     }
   }
 
