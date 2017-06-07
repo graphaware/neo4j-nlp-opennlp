@@ -69,7 +69,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
         GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
         peristence.persistOnGraph(annotateText, false);
-        checkLocation("Pakistan");
+        checkLocation("pakistan");
         checkVerb("show");
 
     }
@@ -80,7 +80,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
             Node pakistanNode = (Node) rowIterator.next();
             assertFalse(rowIterator.hasNext());
             String[] neList = (String[]) pakistanNode.getProperty("ne");
-            assertEquals(neList[0], "LOCATION");
+            assertEquals(neList[0], "location");
             tx.success();
         }
     }
