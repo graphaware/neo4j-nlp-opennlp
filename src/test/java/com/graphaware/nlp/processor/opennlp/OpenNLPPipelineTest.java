@@ -19,22 +19,22 @@ import static org.junit.Assert.*;
  * @author ale
  */
 public class OpenNLPPipelineTest {
-    
+
     public OpenNLPPipelineTest() {
     }
-    
+
     @BeforeClass
     public static void setUpClass() {
     }
-    
+
     @AfterClass
     public static void tearDownClass() {
     }
-    
+
     @Before
     public void setUp() {
     }
-    
+
     @After
     public void tearDown() {
     }
@@ -52,17 +52,38 @@ public class OpenNLPPipelineTest {
                 .extractRelations()*/
                 .build();
         instance.annotate(document);
-        
+
         document.getSentences().forEach((sentence) -> {
             System.out.println(">>>" + sentence.getSentence());
-            if (sentence.getPhrasesIndex()!=null) {
-              sentence.getPhrasesIndex().forEach((phrase) -> {
-                  System.out.println(">>>" + sentence.getChunkStrings()[phrase]);
-              });
+            if (sentence.getPhrasesIndex() != null) {
+                sentence.getPhrasesIndex().forEach((phrase) -> {
+                    System.out.println(">>>" + sentence.getChunkStrings()[phrase]);
+                });
             }
         });
     }
 
-   
-    
+    @Test
+    public void testStopWordsAnnotate() {
+        String text = "Hello Dralyn. Barack Hussein Obama II  is the 44th and current President of the United States, and the first African American to hold the office.";
+        OpenNLPAnnotation document = new OpenNLPAnnotation(text);
+        OpenNLPPipeline instance = new PipelineBuilder()
+                .tokenize()
+                .customStopWordAnnotator("hello,is,and,of,the,to")
+                /*.extractPos()
+                .extractRelations()*/
+                .build();
+        instance.annotate(document);
+
+        document.getSentences().forEach((sentence) -> {
+            System.out.println(">>>" + sentence.getSentence());
+            if (sentence.getTokens() != null) {
+                sentence.getTokens().forEach((token) -> {
+                    System.out.print(" " + token);
+                });
+                System.out.print("\n ");
+            }
+        });
+    }
+
 }

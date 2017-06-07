@@ -58,7 +58,7 @@ class PipelineBuilder {
             stopWordList = alreadyexistingStopWordList + "," + customStopWordList;
         } else {
             annotators.append("stopword");
-            stopWordList = customStopWordList;
+            stopWordList = CUSTOM_STOP_WORD_LIST + "," + customStopWordList;
         }
         properties.setProperty("stopword", stopWordList);
         return this;

@@ -26,12 +26,12 @@ import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import java.util.Optional;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
@@ -45,8 +45,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
     private static final String SENTIMENT = "sentiment";
     private static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
     private static final String PHRASE = "phrase";
-
-    private static final double DEFAULT_SENTIMENT_PROBTHR = 0.7;
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
     private final Pattern patternCheck;
@@ -122,24 +120,15 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, Map<String, String> otherParams) {
-        if (name.length()==0) {
-          name = TOKENIZER;
-          LOG.info("Using default pipeline: " + name);
+        if (name.length() == 0) {
+            name = TOKENIZER;
+            LOG.info("Using default pipeline: " + name);
         }
         OpenNLPPipeline pipeline = pipelines.get(name);
-        if (pipeline==null)
-          throw new RuntimeException("Pipeline: " + name + " doesn't exist");
-        double sentProbThr = DEFAULT_SENTIMENT_PROBTHR;
-        String project = null;
-        if (otherParams!=null) {
-          if (otherParams.containsKey(OptionalNLPParameters.SENTIMENT_PROB_THR))
-            sentProbThr = Double.parseDouble(otherParams.get(OptionalNLPParameters.SENTIMENT_PROB_THR));
-          project = otherParams.getOrDefault(OptionalNLPParameters.CUSTOM_PROJECT, null);
+        if (pipeline == null) {
+            throw new RuntimeException("Pipeline: " + name + " doesn't exist");
         }
-
-        pipeline.reset();
-        pipeline.useTheseCustomParameters(project, sentProbThr);
-        OpenNLPAnnotation document = new OpenNLPAnnotation(text);
+        OpenNLPAnnotation document = new OpenNLPAnnotation(text, otherParams);
         pipeline.annotate(document);
         LOG.info("Annotation for id " + id + " finished.");
 
@@ -160,9 +149,9 @@ public class OpenNLPTextProcessor implements TextProcessor {
     }
 
     private void extractPhrases(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
-        if (sentence.getPhrasesIndex()==null) {
-          LOG.warn("extractPhrases(): phrases index empty, aborting extraction");
-          return;
+        if (sentence.getPhrasesIndex() == null) {
+            LOG.warn("extractPhrases(): phrases index empty, aborting extraction");
+            return;
         }
         sentence.getPhrasesIndex().forEach(index -> {
             Span chunk = sentence.getChunks()[index];
@@ -171,30 +160,28 @@ public class OpenNLPTextProcessor implements TextProcessor {
         });
     }
 
-    protected void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
+    private void extractSentiment(OpenNLPAnnotation.Sentence sentence, Sentence newSentence) {
         int score = -1;
-        if (sentence.getSentiment()!=null) { // && !sentence.getSentiment().equals("-")) {
-          try {
-            score = Integer.valueOf(sentence.getSentiment());
-          } catch (NumberFormatException ex) {
-            LOG.error("NumberFormatException: error extracting sentiment " + sentence.getSentiment() + " as a number.");
-          }
+        if (sentence.getSentiment() != null) { // && !sentence.getSentiment().equals("-")) {
+            try {
+                score = Integer.valueOf(sentence.getSentiment());
+            } catch (NumberFormatException ex) {
+                LOG.error("NumberFormatException: error extracting sentiment " + sentence.getSentiment() + " as a number.", ex);
+            }
         }
         newSentence.setSentiment(score);
     }
 
-    protected void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
-        List<String> tokens = sentence.getTokens();
-        //String text = sentence.getSentence();
-        //System.out.println("Extracting tokens. Text length "+text.length()+", # tokens " + tokens.length);
-        int idx = -1;
-        for (String token : tokens) {
-          idx++;
-          if (token==null || !checkPuntuation(token))
-            continue;
-          //System.out.println("Processing word: " + token);
-          Tag newTag = getTag(sentence, idx, lang);
-          newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
+    private void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
+        Collection<OpenNLPAnnotation.Token> tokens = sentence.getTokens();
+        int idx = 0;
+        for (OpenNLPAnnotation.Token token : tokens) {
+            if (token == null || !checkPuntuation(token.getToken())) {
+                continue;
+            }
+            Tag newTag = getTag(token, lang);
+            newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
+            idx++;
         }
     }
 
@@ -232,7 +219,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //            }
 //        }
 //    }
-
     @Override
     public Tag annotateSentence(String text, String lang) {
 //        Annotation document = new Annotation(text);
@@ -269,43 +255,18 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-    private Tag getTag(OpenNLPAnnotation.Sentence sentence, int tokenIdx, String lang) {
-      List<String> pos = Arrays.asList(NLPDefaultValues.POS);
-      List<String> ne  = Arrays.asList(NLPDefaultValues.NE);
-      String lemma = sentence.getTokens().get(tokenIdx);
+    private Tag getTag(OpenNLPAnnotation.Token token, String lang) {
+        List<String> pos = new ArrayList<>();
+        List<String> ne = new ArrayList<>();
+        String lemma = token.getTokenLemmas();
+        pos.addAll(token.getTokenPOS());
+        ne.addAll(token.getTokenNEs());
 
-      if (sentence.getTokenPosTags()!=null) {
-        try {
-          if (sentence.getTokenPosTags().get(tokenIdx)!=null)
-            pos = sentence.getTokenPosTags().get(tokenIdx);
-        } catch (ArrayIndexOutOfBoundsException ex) {
-          LOG.error("Index %d not in array of POS tags.", tokenIdx);
-        }
-      }
-
-      if (sentence.getTokenNEs()!=null) {
-        try {
-          if (sentence.getTokenNEs().get(tokenIdx)!=null)
-            ne = sentence.getTokenNEs().get(tokenIdx);
-        } catch (ArrayIndexOutOfBoundsException ex) {
-          LOG.error("Index %d not in array of named entities.", tokenIdx);
-        }
-      }
-
-      if (sentence.getTokenLemmas()!=null) {
-        try {
-          if (sentence.getTokenLemmas().get(tokenIdx)!=null && !sentence.getTokenLemmas().get(tokenIdx).equals(OpenNLPAnnotation.defaultLemmaOpenNLP))
-            lemma = sentence.getTokenLemmas().get(tokenIdx);
-        } catch (ArrayIndexOutOfBoundsException ex) {
-          LOG.error("Index %d not in array of lemmas.", tokenIdx);
-        }
-      }
-
-      Tag tag = new Tag(lemma, lang);
-      tag.setPos(pos);
-      tag.setNe(ne);
-      LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
-      return tag;
+        Tag tag = new Tag(lemma, lang);
+        tag.setPos(pos);
+        tag.setNe(ne);
+        LOG.info("POS: " + pos + " ne: " + ne + " lemma: " + lemma);
+        return tag;
     }
 
     @Override
@@ -325,7 +286,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-
     public boolean checkPuntuation(String value) {
         Matcher match = patternCheck.matcher(value);
         return !match.find();
@@ -334,26 +294,17 @@ public class OpenNLPTextProcessor implements TextProcessor {
     @Override
     public AnnotatedText sentiment(AnnotatedText annotated, Map<String, String> otherParams) {
         OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
-        if (pipeline==null) {
-          throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
+        if (pipeline == null) {
+            throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
         }
-        double sentProbThr = DEFAULT_SENTIMENT_PROBTHR;
-        String project = null;
-        if (otherParams!=null) {
-          if (otherParams.containsKey(OptionalNLPParameters.SENTIMENT_PROB_THR))
-            sentProbThr = Double.parseDouble(otherParams.get(OptionalNLPParameters.SENTIMENT_PROB_THR));
-          project = otherParams.getOrDefault(OptionalNLPParameters.CUSTOM_PROJECT, null);
-        }
-
-        pipeline.reset();
-        pipeline.useTheseCustomParameters(project, sentProbThr);
         annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
-            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
+            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence(), otherParams);
             pipeline.annotate(document);
+            
             List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
             Optional<OpenNLPAnnotation.Sentence> sentence = sentences.stream().findFirst();
-            if (sentence!=null && sentence.isPresent()) {
-              extractSentiment(sentence.get(), item);
+            if (sentence != null && sentence.isPresent()) {
+                extractSentiment(sentence.get(), item);
             }
         });
 
@@ -364,13 +315,11 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public String train(String project, String alg, String model, String file, String lang, Map<String, String> params) {
         // training could be done directly here, but it's better to have everything model-implementation related in one class, therefore ...
         OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
-        if (pipeline==null) {
-          throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
+        if (pipeline == null) {
+            throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
-        pipeline.reset();
         return pipeline.train(project, alg, model, file, lang, params);
     }
-
 
     class TokenHolder {
 
@@ -511,48 +460,49 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return new ArrayList<>(pipelines.keySet());
     }
 
-    @Override    
+    @Override
     public boolean checkPipeline(String name) {
         return pipelines.containsKey(name);
     }
-    
+
     @Override
     public void createPipeline(Map<String, Object> pipelineSpec) {
-//        //TODO add validation
-//        String name = (String) pipelineSpec.get("name");
-//        PipelineBuilder pipelineBuilder = new PipelineBuilder();
-//
-//        if ((Boolean) pipelineSpec.getOrDefault("tokenize", true)) {
-//            pipelineBuilder.tokenize();
-//        }
-//
-//        String stopWords = (String) pipelineSpec.getOrDefault("stopWords", "default");
-//        if (stopWords.equalsIgnoreCase("default")) {
-//            pipelineBuilder.defaultStopWordAnnotator();
-//        } else {
-//            pipelineBuilder.customStopWordAnnotator(stopWords);
-//        }
-//
-//        if ((Boolean) pipelineSpec.getOrDefault("sentiment", false)) {
-//            pipelineBuilder.extractSentiment();
-//        }
-//        if ((Boolean) pipelineSpec.getOrDefault("coref", false)) {
-//            pipelineBuilder.extractCoref();
-//        }
-//        if ((Boolean) pipelineSpec.getOrDefault("relations", false)) {
-//            pipelineBuilder.extractRelations();
-//        }
-//        Long threadNumber = (Long) pipelineSpec.getOrDefault("threadNumber", 4);
-//        pipelineBuilder.threadNumber(threadNumber.intValue());
-//
-//        StanfordCoreNLP pipeline = pipelineBuilder.build();
-//        pipelines.put(name, pipeline);
+        //TODO add validation
+        String name = (String) pipelineSpec.get("name");
+        PipelineBuilder pipelineBuilder = new PipelineBuilder();
+
+        if ((Boolean) pipelineSpec.getOrDefault("tokenize", true)) {
+            pipelineBuilder.tokenize();
+        }
+
+        String stopWords = (String) pipelineSpec.getOrDefault("stopWords", "default");
+        if (stopWords.equalsIgnoreCase("default")) {
+            pipelineBuilder.defaultStopWordAnnotator();
+        } else {
+            pipelineBuilder.customStopWordAnnotator(stopWords);
+        }
+
+        if ((Boolean) pipelineSpec.getOrDefault("sentiment", false)) {
+            pipelineBuilder.extractSentiment();
+        }
+        if ((Boolean) pipelineSpec.getOrDefault("coref", false)) {
+            pipelineBuilder.extractCoref();
+        }
+        if ((Boolean) pipelineSpec.getOrDefault("relations", false)) {
+            pipelineBuilder.extractRelations();
+        }
+        Long threadNumber = (Long) pipelineSpec.getOrDefault("threadNumber", 4);
+        pipelineBuilder.threadNumber(threadNumber.intValue());
+
+        OpenNLPPipeline pipeline = pipelineBuilder.build();
+        pipelines.put(name, pipeline);
     }
-    
+
     @Override
     public void removePipeline(String name) {
-        if (!pipelines.containsKey(name))
+        if (!pipelines.containsKey(name)) {
             throw new RuntimeException("No pipeline found with name: " + name);
+        }
         pipelines.remove(name);
     }
 }
