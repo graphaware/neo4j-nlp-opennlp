@@ -5,6 +5,8 @@
  */
 package com.graphaware.nlp.processor.opennlp;
 
+import com.graphaware.nlp.processor.opennlp.model.NERModelTool;
+import com.graphaware.nlp.processor.opennlp.model.SentimentModelTool;
 import static com.graphaware.nlp.processor.opennlp.OpenNLPAnnotation.DEFAULT_LEMMA_OPEN_NLP;
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,10 +48,6 @@ import opennlp.tools.util.model.BaseModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- *
- * @author ale
- */
 public class OpenNLPPipeline {
 
     protected static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
@@ -179,11 +177,8 @@ public class OpenNLPPipeline {
 
     private void setLemmatizer(Properties properties) throws FileNotFoundException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_LEMMATIZER_MODEL, PROPERTY_DEFAULT_LEMMATIZER_MODEL);
-        //LemmatizerModel lemmaModel = loadModel(LemmatizerModel.class, is);
-        lemmaDetector = new DictionaryLemmatizer(is); // needs OpenNLP >=1.7
-        //lemmaDetector = new SimpleLemmatizer(is); // for OpenNLP < 1.7
+        lemmaDetector = new DictionaryLemmatizer(is); 
         closeInputStream(is, PROPERTY_PATH_LEMMATIZER_MODEL);
-        //lemmaDetector = new LemmatizerME(lemmaModel);
     }
 
     private void setCategorizer(Properties properties) throws FileNotFoundException {
@@ -196,7 +191,6 @@ public class OpenNLPPipeline {
             sentimentDetectors.put(DEFAULT_PROJECT_VALUE, null);
         }
 
-        // next custom models (in the `import/` dir of the Neo4j installation)
         for (String key : customSentimentModels.keySet()) {
             try {
                 is = new FileInputStream(new File(customSentimentModels.get(key)));
@@ -279,7 +273,6 @@ public class OpenNLPPipeline {
                                 LOG.info("Running custom NER for project " + customProject + ": " + key);
                                 List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
                                 addNer(ners, nerOccurrences);
-//                                addNamedEntities(ners, sentence);
                             }
                         }
                     }
@@ -298,7 +291,6 @@ public class OpenNLPPipeline {
                 }
             });
 
-            // clearAdaptiveData() should be called between documents, forgets all adaptive data (could impact detection rate otherwise)
             if (annotators.contains("ner")) {
                 for (String key : BASIC_NE_MODEL.keySet()) {
                     if (nameDetectors.containsKey(key)) {
@@ -330,14 +322,12 @@ public class OpenNLPPipeline {
                 currentNer.add(ner);
             });
         }
-//                                addNamedEntities(ners, sentence);
     }
 
     public String train(String project, String alg, String model_str, String fileTrain, String lang, Map<String, String> params) {
         String proj = project.toLowerCase();
         String fileOut = createModelFileName(lang, alg, model_str, proj);
         String newKey = proj + "-" + model_str;
-        //LOG.info(proj + " - " + alg + "(" + alg.toLowerCase() + ") - " + model_str + " - " + fileTrain);
         String result = "";
 
         if (alg.toLowerCase().equals("ner")) {
@@ -345,7 +335,6 @@ public class OpenNLPPipeline {
             nerModel.train();
             result = nerModel.validate();
             nerModel.saveModel(fileOut);
-
             // incorporate this model to the OpenNLPPipeline
             if (nerModel.getModel() != null) {
                 customNeModels.put(newKey, fileOut);
@@ -353,25 +342,19 @@ public class OpenNLPPipeline {
                     nameDetectors.put(newKey, new NameFinderME((TokenNameFinderModel) nerModel.getModel()));
                 }
             }
-
-            nerModel.close();
         } else if (alg.toLowerCase().equals("sentiment")) {
             SentimentModelTool sentModel = new SentimentModelTool(fileTrain, model_str, lang, params);
             sentModel.train();
             result = sentModel.validate();
             sentModel.saveModel(fileOut);
-
             // incorporate this model to the OpenNLPPipeline
             if (sentModel.getModel() != null) {
                 customSentimentModels.put(proj, fileOut);
                 sentimentDetectors.put(proj, new DocumentCategorizerME((DoccatModel) sentModel.getModel()));
             }
-
-            sentModel.close();
         } else {
             throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
         }
-
         return result;
     }
 
@@ -438,13 +421,11 @@ public class OpenNLPPipeline {
     }
 
     private void findAndLoadModelFiles(String path) {
-        if (path == null) {
+        if (path == null || path.length() == 0) {
+            LOG.error("Scanning for model files: wrong path specified.");
             return;
         }
-        if (path.length() == 0) {
-            LOG.warn("Scanning for model files: wrong path specified.");
-            return;
-        }
+        
         File folder = new File(path);
         File[] listOfFiles = folder.listFiles();
         if (listOfFiles == null) {
@@ -455,7 +436,7 @@ public class OpenNLPPipeline {
         if (p.charAt(p.length() - 1) != "/".charAt(0)) {
             path += "/";
         }
-        LOG.debug("path = " + path);
+        LOG.info("path = " + path);
 
         for (int i = 0; i < listOfFiles.length; i++) {
             if (!listOfFiles[i].isFile()) {
@@ -481,7 +462,7 @@ public class OpenNLPPipeline {
             if (sp[1].toLowerCase().equals("ner")) {
                 customNeModels.put(key, path + name);
             } else if (sp[1].toLowerCase().equals("sentiment")) {
-                customSentimentModels.put(/*key*/sp[sp.length - 1].toLowerCase().substring(0, sp[sp.length - 1].length() - 4), path + name);
+                customSentimentModels.put(sp[sp.length - 1].toLowerCase().substring(0, sp[sp.length - 1].length() - 4), path + name);
             }
         }
     }
