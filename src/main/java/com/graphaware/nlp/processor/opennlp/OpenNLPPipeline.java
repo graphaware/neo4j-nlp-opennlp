@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import opennlp.tools.chunker.ChunkerME;
 import opennlp.tools.chunker.ChunkerModel;
@@ -52,6 +53,8 @@ import org.slf4j.LoggerFactory;
 public class OpenNLPPipeline {
 
     protected static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
+
+    public static final String DEFAULT_BACKGROUND_SYMBOL = "O";
 
     protected static final String IMPORT_DIRECTORY = "import/";
 
@@ -249,13 +252,14 @@ public class OpenNLPPipeline {
                     }
 
                     if (annotators.contains("ner")) {
+                        Map<Integer, List<Span>> nerOccurrences = new HashMap<>();
                         // Named Entities identification; needs to be performed after lemmas and POS (see implementation of Sentence.addNamedEntities())
                         BASIC_NE_MODEL.keySet().stream().forEach((modelKey) -> {
                             if (!nameDetectors.containsKey(modelKey)) {
                                 LOG.warn("NER model with key " + modelKey + " not available.");
                             } else {
-                                List ners = Arrays.asList(nameDetectors.get(modelKey).find(sentence.getWords()));
-                                addNamedEntities(ners, sentence);
+                                List<Span> ners = Arrays.asList(nameDetectors.get(modelKey).find(sentence.getWords()));
+                                addNer(ners, nerOccurrences);
                             }
                         });
 
@@ -273,11 +277,14 @@ public class OpenNLPPipeline {
                                 }
                                 LOG.info("Running custom NER for project " + customProject + ": " + key);
                                 List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
-                                addNamedEntities(ners, sentence);
+                                addNer(ners, nerOccurrences);
+//                                addNamedEntities(ners, sentence);
                             }
                         }
+                        processNers(nerOccurrences, sentence);
                     }
-                    forceTokens(sentence);
+
+                    //forceTokens(sentence);
                 }
                 String sentimentDetectorName = customProject != null ? customProject : DEFAULT_PROJECT_VALUE;
                 DocumentCategorizerME sentimentDetector = sentimentDetectors.get(sentimentDetectorName);
@@ -311,6 +318,20 @@ public class OpenNLPPipeline {
             LOG.error("Error processing sentence for text: " + text, ex);
             throw new RuntimeException("Error processing sentence for text: " + text, ex);
         }
+    }
+
+    protected void addNer(List<Span> ners, Map<Integer, List<Span>> nerOccurrences) {
+        if (ners != null && !ners.isEmpty()) {
+            ners.stream().forEach((ner) -> {
+                List<Span> currentNer = nerOccurrences.get(ner.getStart());
+                if (currentNer == null) {
+                    currentNer = new ArrayList<>();
+                    nerOccurrences.put(ner.getStart(), currentNer);
+                }
+                currentNer.add(ner);
+            });
+        }
+//                                addNamedEntities(ners, sentence);
     }
 
     public String train(String project, String alg, String model_str, String fileTrain, String lang, Map<String, String> params) {
@@ -355,43 +376,8 @@ public class OpenNLPPipeline {
         return result;
     }
 
-    private void addNamedEntities(List<Span> ners, OpenNLPAnnotation.Sentence sentence) {
-        if (ners == null || ners.isEmpty() || sentence.getWords() == null) {
-            return;
-        }
-        String[] words = sentence.getWords();
-        String[] lemmas = sentence.getLemmas();
-        String[] posTags = sentence.getPosTags();
-
-        ners.forEach(ne -> {
-            String value = "";
-            String lemma = "";
-            String type = ne.getType();
-            Set<String> posSet = new HashSet<>();
-            for (int i = ne.getStart(); i < ne.getEnd(); i++) {
-                value += " " + words[i];
-                lemma += " " + (lemmas[i].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[i].toLowerCase() : lemmas[i]);
-                posSet.add(posTags[i]);
-            }
-            value = value.trim();
-            lemma = lemma.trim();
-            //check stopwords
-            if (checkStopWords(value)) {
-                OpenNLPAnnotation.Token token = sentence.getToken(value, lemma);
-                token.addTokenNE(type);
-                token.addTokenPOS(posSet);
-                token.addTokenSpans(ne);
-            }
-
-        });
-    }
-
-    private boolean checkStopWords(String value) {
-        return !annotators.contains("stopword") || stopWords.contains(value.toLowerCase());
-    }
-
-    private void forceTokens(OpenNLPAnnotation.Sentence sentence) {
-        if (sentence.getWords() == null || !sentence.getTokens().isEmpty()) {
+    private void processNers(Map<Integer, List<Span>> nerOccurrences, OpenNLPAnnotation.Sentence sentence) {
+        if (sentence.getWords() == null || nerOccurrences == null || nerOccurrences.isEmpty()) {
             return;
         }
         String[] words = sentence.getWords();
@@ -400,18 +386,54 @@ public class OpenNLPPipeline {
         Span[] wordSpans = sentence.getWordSpans();
 
         for (int i = 0; i < words.length; i++) {
-            String value = words[i];
-            String lemma = lemmas[i].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[i].toLowerCase() : lemmas[i];
-            String type = "";
-            Set<String> posSet = new HashSet<>();
-            posSet.add(posTags[i]);
-            if (checkStopWords(value.trim())) {
-                OpenNLPAnnotation.Token token = sentence.getToken(value.trim(), lemma.trim());
-                token.addTokenNE(type);
-                token.addTokenPOS(posSet);
-                token.addTokenSpans(wordSpans[i]);
+            if (nerOccurrences.containsKey(i)) {
+                List<Span> ners = nerOccurrences.get(i);
+                final int startSpan = wordSpans[i].getStart();
+                AtomicInteger index = new AtomicInteger(i);
+                ners.forEach(ne -> {
+                    String value = "";
+                    String lemma = "";
+                    String type = ne.getType();
+                    Set<String> posSet = new HashSet<>();
+                    int endSpan = startSpan;
+                    for (int j = ne.getStart(); j < ne.getEnd(); j++) {
+                        value += " " + words[j];
+                        lemma += " " + (lemmas[j].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[j].toLowerCase() : lemmas[j]);
+                        posSet.add(posTags[j]);
+                        endSpan = wordSpans[j].getEnd();
+                        if (index.get() < j) {
+                            index.set(j);
+                        }
+                    }
+                    
+                    value = value.trim();
+                    lemma = lemma.trim();
+                    //check stopwords
+                    if (isNotStopWord(lemma)) {
+                        OpenNLPAnnotation.Token token = sentence.getToken(value, lemma);
+                        token.addTokenNE(type);
+                        token.addTokenPOS(posSet);
+                        token.addTokenSpans(new Span(startSpan, endSpan));
+                    }
+                });
+                i = index.get();
+            } else {
+                String value = words[i];
+                String lemma = lemmas[i].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[i].toLowerCase() : lemmas[i];
+                String ne = DEFAULT_BACKGROUND_SYMBOL;
+                Set<String> posSet = new HashSet<>();
+                if (isNotStopWord(lemma)) {
+                    OpenNLPAnnotation.Token token = sentence.getToken(value, lemma);
+                    token.addTokenNE(ne);
+                    token.addTokenPOS(posSet);
+                    token.addTokenSpans(wordSpans[i]);
+                }
             }
         }
+    }
+
+    private boolean isNotStopWord(String value) {
+        return !annotators.contains("stopword") || !stopWords.contains(value.toLowerCase());
     }
 
     private void findAndLoadModelFiles(String path) {

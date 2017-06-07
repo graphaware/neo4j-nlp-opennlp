@@ -20,12 +20,9 @@ import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Phrase;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
-import com.graphaware.nlp.domain.NLPDefaultValues;
-import com.graphaware.nlp.util.OptionalNLPParameters;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -174,15 +171,13 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
         Collection<OpenNLPAnnotation.Token> tokens = sentence.getTokens();
-        int idx = 0;
-        for (OpenNLPAnnotation.Token token : tokens) {
-            if (token == null || !checkPuntuation(token.getToken())) {
-                continue;
-            }
+        tokens.stream().filter((token) -> !(token == null || !checkPuntuation(token.getToken()))).forEach((token) -> {
             Tag newTag = getTag(token, lang);
-            newSentence.addTagOccurrence(sentence.getWordStart(idx), sentence.getWordEnd(idx), newSentence.addTag(newTag));
-            idx++;
-        }
+            Tag tagInSentence = newSentence.addTag(newTag);
+            token.getTokenSpans().stream().forEach((span) -> {
+                newSentence.addTagOccurrence(span.getStart(), span.getEnd(), tagInSentence);
+            });
+        });
     }
 
 //    private void extractRelationship(AnnotatedText annotatedText, List<CoreMap> sentences, Annotation document) {
@@ -239,19 +234,21 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public Tag annotateTag(String text, String lang) {
-//        Annotation document = new Annotation(text);
-//        pipelines.get(TOKENIZER).annotate(document);
-//        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-//        Optional<CoreMap> sentence = sentences.stream().findFirst();
-//        if (sentence.isPresent()) {
-//            Optional<Tag> oTag = sentence.get().get(CoreAnnotations.TokensAnnotation.class).stream()
-//                    .map((token) -> getTag(token))
-//                    .filter((tag) -> (tag != null) && checkPuntuation(tag.getLemma()))
-//                    .findFirst();
-//            if (oTag.isPresent()) {
-//                return oTag.get();
-//            }
-//        }
+        OpenNLPAnnotation document = new OpenNLPAnnotation(text);
+        pipelines.get(TOKENIZER).annotate(document);
+        List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+        if (sentences != null && !sentences.isEmpty()) {
+            if (sentences.size() > 1) {
+                throw new RuntimeException("More than one sentence");
+            }
+            Collection<OpenNLPAnnotation.Token> tokens = sentences.get(0).getTokens();
+            if (tokens != null && tokens.size() > 0) {
+                OpenNLPAnnotation.Token token = tokens.iterator().next();
+                Tag newTag = getTag(token, lang);
+                return newTag;
+            }
+            
+        }
         return null;
     }
 

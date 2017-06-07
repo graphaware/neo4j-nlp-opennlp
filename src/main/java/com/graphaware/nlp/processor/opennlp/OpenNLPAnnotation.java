@@ -133,7 +133,6 @@ public class OpenNLPAnnotation {
             }
             this.wordSpans = spans;
             this.words = Arrays.asList(spans).stream()
-                    //.map(span -> new String(this.sentenceText.substring(span.getStart(), span.getEnd())))
                     .map(span -> String.valueOf(span.getCoveredText(this.sentenceText)))
                     .collect(Collectors.toList()).toArray(new String[wordSpans.length]);
         }
@@ -190,14 +189,14 @@ public class OpenNLPAnnotation {
             this.chunkSentiments = sents;
         }
 
-        @Deprecated
-        public void setDefaultChunks() {
-            this.chunks = new Span[this.words.length];
-            Arrays.fill(this.chunks, new Span(0, 0));
-            this.chunkStrings = new String[this.words.length];
-            Arrays.fill(this.chunkStrings, defaultStringValue);
-            this.nounphrases = new ArrayList<>();
-        }
+//        @Deprecated
+//        public void setDefaultChunks() {
+//            this.chunks = new Span[this.words.length];
+//            Arrays.fill(this.chunks, new Span(0, 0));
+//            this.chunkStrings = new String[this.words.length];
+//            Arrays.fill(this.chunkStrings, defaultStringValue);
+//            this.nounphrases = new ArrayList<>();
+//        }
 
         public List<Integer> getPhrasesIndex() {
             //if (nounphrases==null)
@@ -270,6 +269,10 @@ public class OpenNLPAnnotation {
 
         public void addTokenPOS(Collection<String> tokenPOSes) {
             this.tokenPOS.addAll(tokenPOSes);
+        }
+        
+        public void addTokenPOS(String tokenPOS) {
+            this.tokenPOS.add(tokenPOS);
         }
 
         public String getTokenLemmas() {
