@@ -16,7 +16,6 @@
 package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.domain.AnnotatedText;
-import com.graphaware.nlp.domain.Phrase;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
 import com.graphaware.nlp.persistence.GraphPersistence;
@@ -24,13 +23,8 @@ import com.graphaware.nlp.persistence.LocalGraphDatabase;
 import com.graphaware.nlp.processor.TextProcessor;
 import com.graphaware.nlp.util.ServiceLoader;
 import com.graphaware.test.integration.EmbeddedDatabaseIntegrationTest;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.QueryExecutionException;
@@ -40,7 +34,6 @@ import org.neo4j.graphdb.Transaction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 

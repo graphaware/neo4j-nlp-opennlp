@@ -104,7 +104,7 @@ public class OpenNLPPipeline {
 
     public OpenNLPPipeline(Properties properties) {
         this.annotators = Arrays.asList(properties.getProperty("annotators", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
-        this.stopWords = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
+        this.stopWords = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim().toLowerCase()).collect(Collectors.toList());
         LOG.info("Annotators: " + annotators);
         LOG.info("Stop words: " + stopWords);
         init(properties);
@@ -175,9 +175,9 @@ public class OpenNLPPipeline {
         }
     }
 
-    private void setLemmatizer(Properties properties) throws FileNotFoundException {
+    private void setLemmatizer(Properties properties) throws FileNotFoundException, IOException {
         InputStream is = getInputStream(properties, PROPERTY_PATH_LEMMATIZER_MODEL, PROPERTY_DEFAULT_LEMMATIZER_MODEL);
-        lemmaDetector = new DictionaryLemmatizer(is); 
+        lemmaDetector = new DictionaryLemmatizer(is);
         closeInputStream(is, PROPERTY_PATH_LEMMATIZER_MODEL);
     }
 
@@ -210,25 +210,25 @@ public class OpenNLPPipeline {
     public void annotate(OpenNLPAnnotation document) {
         String text = document.getText();
         String customProject = document.getProject();
-        LOG.info("Annotating text: " + text + " using stopwords: " + stopWords);
         try {
             Span sentences[] = sentenceDetector.sentPosDetect(text);
             document.setSentences(sentences);
-            document.getSentences().stream().forEach((OpenNLPAnnotation.Sentence sentence) -> {
-                if (annotators.contains("tokenize") && wordBreaker != null) {
-                    Span[] wordSpans = wordBreaker.tokenizePos(sentence.getSentence());
+            document.getSentences().stream()
+                    .forEach((OpenNLPAnnotation.Sentence sentence) -> {
+                        if (annotators.contains("tokenize") && wordBreaker != null) {
+                            Span[] wordSpans = wordBreaker.tokenizePos(sentence.getSentence());
+                            if (wordSpans != null && wordSpans.length > 0) {
+                                sentence.setWordsAndSpans(wordSpans);
 
-                    sentence.setWordsAndSpans(wordSpans);
-                    LOG.info("Final words: " + Arrays.toString(sentence.getWords()));
-                    if (annotators.contains("pos") && posme != null) {
-                        String[] posTags = posme.tag(sentence.getWords());
-                        sentence.setPosTags(posTags);
-                        if (annotators.contains("lemma")) {
-                            String[] finLemmas = lemmaDetector.lemmatize(sentence.getWords(), posTags);
-                            sentence.setLemmas(finLemmas);
-                        }
+                                if (annotators.contains("pos") && posme != null) {
+                                    String[] posTags = posme.tag(sentence.getWords());
+                                    sentence.setPosTags(posTags);
+                                    if (annotators.contains("lemma")) {
+                                        String[] finLemmas = lemmaDetector.lemmatize(sentence.getWords(), posTags);
+                                        sentence.setLemmas(finLemmas);
+                                    }
 
-                        //FIXME: this is wrong
+                                    //FIXME: this is wrong
 //                        if (annotators.contains("relation")) {
 //                            Span[] chunks = chunkerME.chunkAsSpans(sentence.getWords(), posTags);
 //                            sentence.setChunks(chunks);
@@ -243,68 +243,71 @@ public class OpenNLPPipeline {
 //                                sentence.setChunkSentiments(chunkSentiments.toArray(new String[chunkSentiments.size()]));
 //                            }
 //                        } 
-                    }
-                    
-                    Map<Integer, List<Span>> nerOccurrences = new HashMap<>();
-                    if (annotators.contains("ner")) {
+                                }
 
-                        // Named Entities identification; needs to be performed after lemmas and POS (see implementation of Sentence.addNamedEntities())
-                        BASIC_NE_MODEL.keySet().stream().forEach((modelKey) -> {
-                            if (!nameDetectors.containsKey(modelKey)) {
-                                LOG.warn("NER model with key " + modelKey + " not available.");
-                            } else {
-                                List<Span> ners = Arrays.asList(nameDetectors.get(modelKey).find(sentence.getWords()));
-                                addNer(ners, nerOccurrences);
-                            }
-                        });
+                                Map<Integer, List<Span>> nerOccurrences = new HashMap<>();
+                                if (annotators.contains("ner") && sentence.getWords() != null) {
 
-                        if (customProject != null) {
-                            for (String key : customNeModels.keySet()) {
-                                if (!nameDetectors.containsKey(key)) {
-                                    LOG.warn("Custom NER model with key " + key + " not available.");
-                                    continue;
+                                    // Named Entities identification; needs to be performed after lemmas and POS (see implementation of Sentence.addNamedEntities())
+                                    BASIC_NE_MODEL.keySet().stream().forEach((modelKey) -> {
+                                        if (!nameDetectors.containsKey(modelKey)) {
+                                            LOG.warn("NER model with key " + modelKey + " not available.");
+                                        } else {
+                                            List<Span> ners = Arrays.asList(nameDetectors.get(modelKey).find(sentence.getWords()));
+                                            addNer(ners, nerOccurrences);
+                                        }
+                                    });
+
+                                    if (customProject != null) {
+                                        for (String key : customNeModels.keySet()) {
+                                            if (!nameDetectors.containsKey(key)) {
+                                                LOG.warn("Custom NER model with key " + key + " not available.");
+                                                continue;
+                                            }
+                                            if (key.split("-").length == 0) {
+                                                continue;
+                                            }
+                                            if (!key.split("-")[0].equals(customProject)) {
+                                                continue;
+                                            }
+                                            LOG.info("Running custom NER for project " + customProject + ": " + key);
+                                            List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
+                                            addNer(ners, nerOccurrences);
+                                        }
+                                    }
                                 }
-                                if (key.split("-").length == 0) {
-                                    continue;
-                                }
-                                if (!key.split("-")[0].equals(customProject)) {
-                                    continue;
-                                }
-                                LOG.info("Running custom NER for project " + customProject + ": " + key);
-                                List ners = Arrays.asList(nameDetectors.get(key).find(sentence.getWords()));
-                                addNer(ners, nerOccurrences);
+                                processTokens(sentence, nerOccurrences);
                             }
                         }
-                    }
-                    processTokens(sentence, nerOccurrences);
-                }
-                String sentimentDetectorName = customProject != null ? customProject : DEFAULT_PROJECT_VALUE;
-                DocumentCategorizerME sentimentDetector = sentimentDetectors.get(sentimentDetectorName);
-                if (annotators.contains("sentiment") && sentimentDetector != null) {
-                    double[] outcomes = sentimentDetector.categorize(sentence.getSentence());
-                    String category = sentimentDetector.getBestCategory(outcomes);
-                    if (Arrays.stream(outcomes).max().getAsDouble() < document.getSentimentProb()) {
-                        category = "2";
-                    }
-                    sentence.setSentiment(category);
-                    LOG.info("Sentiment results: sentence = " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
-                }
-            });
-
-            if (annotators.contains("ner")) {
-                for (String key : BASIC_NE_MODEL.keySet()) {
-                    if (nameDetectors.containsKey(key)) {
-                        nameDetectors.get(key).clearAdaptiveData();
-                    }
-                }
-                if (customProject != null) {
-                    for (String key : customNeModels.keySet()) {
-                        if (nameDetectors.containsKey(key)) {
-                            nameDetectors.get(key).clearAdaptiveData();
+                        if (sentence.getWords() != null && sentence.getWords().length > 0) {
+                            String sentimentDetectorName = customProject != null ? customProject : DEFAULT_PROJECT_VALUE;
+                            DocumentCategorizerME sentimentDetector = sentimentDetectors.get(sentimentDetectorName);
+                            if (annotators.contains("sentiment") && sentimentDetector != null) {
+                                double[] outcomes = sentimentDetector.categorize(sentence.getWords());
+                                String category = sentimentDetector.getBestCategory(outcomes);
+                                if (Arrays.stream(outcomes).max().getAsDouble() < document.getSentimentProb()) {
+                                    category = "2";
+                                }
+                                sentence.setSentiment(category);
+                                LOG.info("Sentiment results: sentence = " + sentence.getSentence() + "; category = " + category + "; outcomes = " + Arrays.toString(outcomes));
+                            }
                         }
-                    }
-                }
-            }
+                    });
+
+//            if (annotators.contains("ner")) {
+//                for (String key : BASIC_NE_MODEL.keySet()) {
+//                    if (nameDetectors.containsKey(key)) {
+//                        nameDetectors.get(key).clearAdaptiveData();
+//                    }
+//                }
+//                if (customProject != null) {
+//                    for (String key : customNeModels.keySet()) {
+//                        if (nameDetectors.containsKey(key)) {
+//                            nameDetectors.get(key).clearAdaptiveData();
+//                        }
+//                    }
+//                }
+//            }
         } catch (Exception ex) {
             LOG.error("Error processing sentence for text: " + text, ex);
             throw new RuntimeException("Error processing sentence for text: " + text, ex);
@@ -425,7 +428,7 @@ public class OpenNLPPipeline {
             LOG.error("Scanning for model files: wrong path specified.");
             return;
         }
-        
+
         File folder = new File(path);
         File[] listOfFiles = folder.listFiles();
         if (listOfFiles == null) {

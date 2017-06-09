@@ -133,7 +133,7 @@ public class OpenNLPAnnotation {
             }
             this.wordSpans = spans;
             this.words = Arrays.asList(spans).stream()
-                    .map(span -> String.valueOf(span.getCoveredText(this.sentenceText)))
+                    .map(span -> String.valueOf(span.getCoveredText(sentenceText)))
                     .collect(Collectors.toList()).toArray(new String[wordSpans.length]);
         }
 
