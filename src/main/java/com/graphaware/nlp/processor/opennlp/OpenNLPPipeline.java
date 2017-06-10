@@ -105,8 +105,6 @@ public class OpenNLPPipeline {
     public OpenNLPPipeline(Properties properties) {
         this.annotators = Arrays.asList(properties.getProperty("annotators", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
         this.stopWords = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim().toLowerCase()).collect(Collectors.toList());
-        LOG.info("Annotators: " + annotators);
-        LOG.info("Stop words: " + stopWords);
         init(properties);
     }
 

@@ -242,12 +242,15 @@ public class OpenNLPTextProcessor implements TextProcessor {
                 throw new RuntimeException("More than one sentence");
             }
             Collection<OpenNLPAnnotation.Token> tokens = sentences.get(0).getTokens();
-            if (tokens != null && tokens.size() > 0) {
+            if (tokens != null && tokens.size() == 1) {
                 OpenNLPAnnotation.Token token = tokens.iterator().next();
                 Tag newTag = getTag(token, lang);
                 return newTag;
+            } else if (tokens != null && tokens.size() > 1) {
+                OpenNLPAnnotation.Token token = document.getToken(text, text);
+                Tag newTag = getTag(token, lang);
+                return newTag;
             }
-            
         }
         return null;
     }
@@ -268,18 +271,23 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     @Override
     public List<Tag> annotateTags(String text, String lang) {
-        /*List<Tag> result = new ArrayList<>();
-        Annotation document = new Annotation(text);
+        List<Tag> result = new ArrayList<>();
+        OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipelines.get(TOKENIZER).annotate(document);
-        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-        Optional<CoreMap> sentence = sentences.stream().findFirst();
-        if (sentence.isPresent()) {
-            Stream<Tag> oTags = sentence.get().get(CoreAnnotations.TokensAnnotation.class).stream()
-                    .map((token) -> getTag(lang, token))
-                    .filter((tag) -> (tag != null) && checkPuntuation(tag.getLemma()));
-            oTags.forEach((tag) -> result.add(tag));
+       List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+        if (sentences != null && !sentences.isEmpty()) {
+            if (sentences.size() > 1) {
+                throw new RuntimeException("More than one sentence");
+            }
+            Collection<OpenNLPAnnotation.Token> tokens = sentences.get(0).getTokens();
+            if (tokens != null && tokens.size() > 0) {
+                tokens.stream().forEach((token) -> {
+                    Tag newTag = getTag(token, lang);
+                    result.add(newTag);
+                });                
+                return result;
+            }            
         }
-        return result;*/
         return null;
     }
 

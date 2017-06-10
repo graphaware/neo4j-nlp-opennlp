@@ -63,6 +63,10 @@ public class OpenNLPAnnotation {
         }
         return null;
     }
+    
+    public Token getToken(String token, String lemma) {
+        return new Token(token, lemma);
+    }
 
     class Sentence {
 
