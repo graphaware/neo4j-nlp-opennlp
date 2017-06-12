@@ -26,14 +26,12 @@ import org.slf4j.LoggerFactory;
 public class NERModelTool extends OpenNLPGenericModelTool {
 
     private String entityType;
-    private final String lang;
     private static final String MODEL_NAME = "NER";
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
     public NERModelTool(String fileIn, String modelDescr, String lang, Map<String, String> params) {
-        super(fileIn, modelDescr, params);
-        this.lang = lang;
+        super(fileIn, modelDescr, lang, params);
         this.entityType = null; // train only specific named entity; null = train all entities present in the training set
         if (params != null) {
             if (params.containsKey(GenericModelParameters.TRAIN_ENTITYTYPE)) {
@@ -46,12 +44,16 @@ public class NERModelTool extends OpenNLPGenericModelTool {
         this(fileIn, modelDescr, lang, null);
     }
 
+    public NERModelTool() {
+      super();
+    }
+
     public void train() {
         LOG.info("Starting training of " + MODEL_NAME + " ...");
         try (ObjectStream<String> lineStream = openFile(fileIn); NameSampleDataStream sampleStream = new NameSampleDataStream(lineStream)) {
             this.model = NameFinderME.train(lang, entityType, sampleStream, trainParams, new TokenNameFinderFactory());
         } catch (IOException ex) {
-            LOG.error("Error while opening training: " + fileIn, ex);
+            LOG.error("Error while opening training file: " + fileIn, ex);
             throw new RuntimeException("Error while training " + MODEL_NAME + " model " + this.modelDescr, ex);
         } catch (Exception ex) {
             LOG.error("Error while training " + MODEL_NAME + " model " + modelDescr);
@@ -74,28 +76,36 @@ public class NERModelTool extends OpenNLPGenericModelTool {
                         + ", Recall = " + decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
                 LOG.info("Validation: " + result);
             } catch (IOException ex) {
-                LOG.error("Error while opening training: " + fileIn, ex);
-                throw new RuntimeException("Error while training " + MODEL_NAME + " model " + modelDescr, ex);
+                LOG.error("Error while opening training file: " + fileIn, ex);
+                throw new RuntimeException("IOError while evaluating " + MODEL_NAME + " model " + modelDescr, ex);
             } catch (Exception ex) {
-                LOG.error("Error while validating " + MODEL_NAME + " model.", ex);
-                throw new RuntimeException("Error while training " + MODEL_NAME + " model " + modelDescr, ex);
+                LOG.error("Error while evaluating " + MODEL_NAME + " model.", ex);
+                throw new RuntimeException("Error while evaluating " + MODEL_NAME + " model " + modelDescr, ex);
             }
         } else {
-            try (ObjectStream<String> lineStreamValidate = openFile(fileValidate); NameSampleDataStream sampleStreamValidate = new NameSampleDataStream(lineStreamValidate)) {
-                TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(new NameFinderME((TokenNameFinderModel) model));
-                evaluator.evaluate(sampleStreamValidate);
-                result = "F = " + decFormat.format(evaluator.getFMeasure().getFMeasure())
-                        + " (Precision = " + decFormat.format(evaluator.getFMeasure().getPrecisionScore())
-                        + ", Recall = " + decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
-                LOG.info("Validation: " + result);
-            } catch (IOException ex) {
-                LOG.error("Error while opening training: " + fileValidate, ex);
-                throw new RuntimeException("Error while training " + MODEL_NAME + " model " + modelDescr, ex);
-            } catch (Exception ex) {
-                LOG.error("Error while validating " + this.MODEL_NAME + " model.", ex);
-            }
+          result = test(this.fileValidate, new NameFinderME((TokenNameFinderModel) model));
         }
 
+        return result;
+    }
+
+    public String test(String file, NameFinderME modelME) {
+        LOG.info("Starting testing of " + MODEL_NAME + " ...");
+        String result = "";
+        try (ObjectStream<String> lineStreamValidate = openFile(file); NameSampleDataStream sampleStreamValidate = new NameSampleDataStream(lineStreamValidate)) {
+            //TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(new NameFinderME((TokenNameFinderModel) model));
+            TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(modelME);
+            evaluator.evaluate(sampleStreamValidate);
+            result = "F = " + decFormat.format(evaluator.getFMeasure().getFMeasure())
+                    + " (Precision = " + decFormat.format(evaluator.getFMeasure().getPrecisionScore())
+                    + ", Recall = " + decFormat.format(evaluator.getFMeasure().getRecallScore()) + ")";
+            LOG.info("Testing result: " + result);
+        } catch (IOException ex) {
+            LOG.error("Error while opening test file: " + file, ex);
+            throw new RuntimeException("Error while testing " + MODEL_NAME + " model " + modelDescr, ex);
+        } catch (Exception ex) {
+            LOG.error("Error while testing " + this.MODEL_NAME + " model.", ex);
+        }
         return result;
     }
 }

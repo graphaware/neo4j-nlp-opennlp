@@ -274,7 +274,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
         List<Tag> result = new ArrayList<>();
         OpenNLPAnnotation document = new OpenNLPAnnotation(text);
         pipelines.get(TOKENIZER).annotate(document);
-       List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+        List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         if (sentences != null && !sentences.isEmpty()) {
             if (sentences.size() > 1) {
                 throw new RuntimeException("More than one sentence");
@@ -324,6 +324,16 @@ public class OpenNLPTextProcessor implements TextProcessor {
             throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
         return pipeline.train(project, alg, model, file, lang, params);
+    }
+
+    @Override
+    public String test(String project, String alg, String model, String file, String lang) {
+        OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
+        if (pipeline == null) {
+            throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
+        }
+        return pipeline.test(project, alg, model, file, lang);
+
     }
 
     class TokenHolder {

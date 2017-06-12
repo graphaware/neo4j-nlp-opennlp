@@ -20,9 +20,11 @@ This package is an extention of the <a href="https://github.com/graphaware/neo4j
 ```
   cd neo4j-nlp
   mvn clean install
+  cp target/graphaware-nlp-1.0-SNAPSHOT.jar <YOUR_NEO4J_DIR>/plugins
 
   cd ../neo4j-nlp-opennlp
   mvn clean package
+  cp target/nlp-opennlp-1.0.0-SNAPSHOT.jar <YOUR_NEO4J_DIR>/plugins
 ```
 
 
@@ -70,8 +72,9 @@ CALL ga.nlp.train({[project: "myXYProject",] alg: "NER", model: "component", fil
 ```
   * `project` (case insensitive) is an arbitrary string that allows to specify in the `annotate()` procedure that we want, apart from the default models, to use also the custom model(s) associated with `project`
   * `alg` (case insensitive) specifies which algorithm is about to be trained; currently available algs: `NER`, `sentiment`
-  * `model` arbitrary string that provides, in combination with `alg` (and with `project` if it's specified), a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
+  * `model` is an arbitrary string that provides, in combination with `alg` (and with `project` if it's specified), a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
   * `file` is path to the training data file
+  * `validationFile` is path to the validation/test data file (if not specified, cross-validation method is used, see paragraph *Validation*)
   * `lang` (default is "en") specifies the language
   * `textProcessor` (optional) - for details see description in parent package (*neo4j-nlp*)
   * **training parameters** (defined in `com.graphaware.nlp.util.GenericModelParameters`) are optional and are not universal (some might be specific to only certain Text Processor):
@@ -106,14 +109,14 @@ RETURN l, result;
     * one empty line between two different texts (paragraphs)
     * there must be a space before and after each `<START:my_category>` and `<END>` statement
     * training data must not contain HTML symbols (such as `H<sub>2</sub>O`); **TO DO:** check whether text on which NER model is deployed needs to be manually deprived of HTML symbols or whether they are ignored automatically
-    * Example for two new categories ("component" and "chemical"):
+    * Example: categories "person", "organization", "location"):
     ```
-    <START:component> Space Shuttle Alkaline Fuel Cell Powerplants <END>  ( <START:component> FCPs <END> ) use <START:chemical> O2 <END> and <START:chemical> H2 <END> as reactants.
-    These  <START:component> FCPs <END>  require higher grade <START:chemical> LH2 <END> and <START:chemical> LO2 <END> (99.99% and 99.989% purity levels, respectively) than  <START:component> Space Shuttle Main Engines <END>  (99.9% <START:chemical> LH2 <END> and 99.2% <START:chemical> LO2 <END> ).
+    <START:person> Theresa May <END> has said she will form a government with the support of the <START:organization> Democratic Unionists <END> that can provide "certainty" for the future.
+    Speaking after visiting <START:location> Buckingham Palace <END> , she said only her party had the "legitimacy" to govern after winning the most seats and votes.
+    In a short statement outside <START:location> Downing Street <END> , which followed a 25-minute audience with <START:person> The Queen <END> , Mrs <START:person> May <END> said she intended to form a government which could "provide certainty and lead <START:location> Britain <END> forward at this critical time for our country".
 
-    Residual <START:chemical> hydrogen <END> in the fill and drain line during the <START:event> terminal count down sequence <END>  could lead to a catastrophic failure.
-    The best practice is to connect the  <START:component> purge line <END>  to the  <START:component> propellant line <END>  as closely as possible to the dead headed end of the line to ensure complete purging on the line.
-    Residual <START:chemical> hydrogen <END> in certain locations in <START:component> feed systems <END>  for liquid propulsion can create potentially catastrophic conditions at launch.
+    The <START:organization> Cabinet Office <END> revealed on <START:date> Wednesday <END> that <START:location> Japan's <END> GDP grew by 0.3% during the <START:date> first quarter of 2017 <END> .
+    Although the reading missed a forecast of 0.6% growth, <START:location> Japan's <END> economy continued to expand in five consecutive quarters, the country's highest streak in three years.
     ```
   * `sentiment` - two columns separated by a white space (tab): the first column is a category as integer (0=VeryNegative, 1=Negative, 2=Neutral, 3=Positive, 4=VeryPositive), the second column is a sentence; example:
     ```
@@ -124,6 +127,18 @@ RETURN l, result;
     1   Damn..the train is late again...
     ```
 
-**Validation:**
+**Validation/testing:**
 
-Model validations are performed using OpenNLP cross-validation method. The validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the sample size ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.
+Evaluation of the new model is performed automatically when invoking procedure `ga.nlp.train()`. If `validationFile` is specified, it is used to test the performance of the new model. If not, evaluation is performed using OpenNLP cross-validation method: validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the sample size ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.
+
+The following procedure can be invoked to test already existing models:
+```
+CALL ga.nlp.test({[project: "myXYProject",] alg: "NER", model: "location", file: "<path_to_your_training_file>" [, lang: "en"]})
+```
+Parameters
+  * `project` (optional) allows to specify which of the existing models we want to test (otherwise it uses the default)
+  * `alg` (case insensitive) specifies which algorithm is about to be trained; currently available algs: `NER`, `sentiment`
+  * `model` is an arbitrary string that provides, in combination with `alg` (and with `project` if it's specified), a unique identifier of the model that you want to 
+  * `file` is a path to the test file
+  * `lang` specified the language
+

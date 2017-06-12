@@ -32,6 +32,7 @@ public class OpenNLPGenericModelTool {
     protected BaseModel model;
     protected TrainingParameters trainParams;
     protected final String modelDescr;
+    protected final String lang;
     protected final DecimalFormat decFormat;
     protected int nFolds;
 
@@ -40,19 +41,28 @@ public class OpenNLPGenericModelTool {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
-    public OpenNLPGenericModelTool(String file, String modelDescr) {
+    public OpenNLPGenericModelTool(String file, String modelDescr, String lang) {
         this.fileValidate = null;
         this.fileIn = file;
         this.nFolds = 10;
         this.modelDescr = modelDescr;
+        this.lang = lang;
         this.decFormat = new DecimalFormat("#0.00"); // for formating validation results with precision 2 decimals
 
         this.setDefParams();
     }
 
-    public OpenNLPGenericModelTool(String file, String modelDescr, Map<String, String> params) {
-        this(file, modelDescr);
+    public OpenNLPGenericModelTool(String file, String modelDescr, String lang, Map<String, String> params) {
+        this(file, modelDescr, lang);
         this.setTrainingParameters(params);
+    }
+
+    /*
+     * This constructor needed for invoking test() method only (model is provided ar argument of train() )
+     */
+    public OpenNLPGenericModelTool() {
+        this(null, null, null);
+        this.model = null;
     }
 
     // override this method in your child-class if you want different defaults

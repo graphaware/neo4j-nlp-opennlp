@@ -93,13 +93,13 @@ public class OpenNLPPipeline {
 
     {
         BASIC_NE_MODEL = new HashMap<>();
-        BASIC_NE_MODEL.put("namefinder", "en-ner-person.bin");
-        BASIC_NE_MODEL.put("datefinder", "en-ner-date.bin");
-        BASIC_NE_MODEL.put("locationfinder", "en-ner-location.bin");
-        BASIC_NE_MODEL.put("timefinder", "en-ner-time.bin");
-        BASIC_NE_MODEL.put("organizationfinder", "en-ner-organization.bin");
-        BASIC_NE_MODEL.put("moneyfinder", "en-ner-money.bin");
-        BASIC_NE_MODEL.put("percentagefinder", "en-ner-percentage.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-person", "en-ner-person.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-date", "en-ner-date.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-location", "en-ner-location.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-time", "en-ner-time.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-organization", "en-ner-organization.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-money", "en-ner-money.bin");
+        BASIC_NE_MODEL.put(DEFAULT_PROJECT_VALUE + "-percentage", "en-ner-percentage.bin");
     }
 
     public OpenNLPPipeline(Properties properties) {
@@ -353,6 +353,31 @@ public class OpenNLPPipeline {
                 customSentimentModels.put(proj, fileOut);
                 sentimentDetectors.put(proj, new DocumentCategorizerME((DoccatModel) sentModel.getModel()));
             }
+        } else {
+            throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
+        }
+        return result;
+    }
+
+    public String test(String project, String alg, String model_str, String file, String lang) {
+        String proj = project.toLowerCase();
+        String modelID = proj + "-" + model_str;
+        String result = "failure";
+
+        if (alg.toLowerCase().equals("ner")) {
+          if (nameDetectors.containsKey(modelID)) {
+            LOG.info("Testing NER model: " + modelID);
+            NERModelTool nerModel = new NERModelTool();
+            result = nerModel.test(file, nameDetectors.get(modelID));
+          } else
+            LOG.error("Required NER model doesn't exist: project = " + project + ", model = " + model_str);
+        } else if (alg.toLowerCase().equals("sentiment")) {
+          if (sentimentDetectors.containsKey(modelID)) {
+            LOG.info("Testing sentiment model: " + modelID);
+            SentimentModelTool sentModel = new SentimentModelTool();
+            result = sentModel.test(file, sentimentDetectors.get(modelID));
+          } else
+            LOG.error("Required sentiment model doesn't exist: project = " + project);
         } else {
             throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
         }

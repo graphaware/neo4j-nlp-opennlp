@@ -51,18 +51,19 @@ import org.slf4j.LoggerFactory;
  */
 public class SentimentModelTool extends OpenNLPGenericModelTool {
 
-    private final String lang;
     private static final String MODEL_NAME = "sentiment";
-
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
     public SentimentModelTool(String fileIn, String modelDescr, String lang, Map<String, String> params) {
-        super(fileIn, modelDescr, params);
-        this.lang = lang;
+        super(fileIn, modelDescr, lang, params);
     }
 
     public SentimentModelTool(String fileIn, String modelDescr, String lang) {
         this(fileIn, modelDescr, lang, null);
+    }
+
+    public SentimentModelTool() {
+        super();
     }
 
     // here you can specify default parameters specific to this class
@@ -94,26 +95,34 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
                 result = "Accuracy = " + this.decFormat.format(evaluator.getDocumentAccuracy());
                 LOG.info("Validation: " + result);
             } catch (IOException e) {
-                LOG.error("IOError while validate a custom " + MODEL_NAME + " model " + modelDescr, e);
-                throw new RuntimeException("IOError while training a custom " + MODEL_NAME + " model " + this.modelDescr, e);
+                LOG.error("Error while opening training file: " + fileIn, e);
+                throw new RuntimeException("IOError while evaluating a " + MODEL_NAME + " model " + this.modelDescr, e);
             } catch (Exception ex) {
-                LOG.error("Error while validating " + this.MODEL_NAME + " model.", ex);
+                LOG.error("Error while evaluating " + this.MODEL_NAME + " model.", ex);
             }
         } else {
             // Using a separate .test file provided by user
-            try (ObjectStream<String> lineStream = openFile(fileValidate); ObjectStream<DocumentSample> sampleStreamValidate = new DocumentSampleStream(lineStream)) {
-                DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(new DocumentCategorizerME((DoccatModel) this.model));
-                evaluator.evaluate(sampleStreamValidate);
-                result = "Accuracy = " + this.decFormat.format(evaluator.getAccuracy());
-                LOG.info("Validation: " + result);
-            } catch (IOException e) {
-                LOG.error("IOError while validate a custom " + MODEL_NAME + " model " + modelDescr, e);
-                throw new RuntimeException("IOError while training a custom " + MODEL_NAME + " model " + this.modelDescr, e);
-            } catch (Exception ex) {
-                LOG.error("Error while validating " + this.MODEL_NAME + " model.", ex);
-            }
+            result = test(this.fileValidate, new DocumentCategorizerME((DoccatModel) this.model));
         }
 
+        return result;
+    }
+
+    public String test(String file, DocumentCategorizerME modelME) {
+        LOG.info("Starting testing of " + this.MODEL_NAME + " ...");
+        String result = "";
+        try (ObjectStream<String> lineStream = openFile(file); ObjectStream<DocumentSample> sampleStreamValidate = new DocumentSampleStream(lineStream)) {
+            //DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(new DocumentCategorizerME((DoccatModel) this.model));
+            DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(modelME);
+            evaluator.evaluate(sampleStreamValidate);
+            result = "Accuracy = " + this.decFormat.format(evaluator.getAccuracy());
+            LOG.info("Validation: " + result);
+        } catch (IOException e) {
+            LOG.error("Error while opening a test file: " + file, e);
+            throw new RuntimeException("IOError while testing a " + MODEL_NAME + " model " + this.modelDescr, e);
+        } catch (Exception ex) {
+            LOG.error("Error while testing " + this.MODEL_NAME + " model.", ex);
+        }
         return result;
     }
 }
