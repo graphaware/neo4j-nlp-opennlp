@@ -38,10 +38,10 @@ import org.slf4j.LoggerFactory;
 public class OpenNLPTextProcessor implements TextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
-    private static final String TOKENIZER = "tokenizer";
-    private static final String SENTIMENT = "sentiment";
-    private static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
-    private static final String PHRASE = "phrase";
+    public static final String TOKENIZER = "tokenizer";
+    public static final String SENTIMENT = "sentiment";
+    public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
+    public static final String PHRASE = "phrase";
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
     private final Pattern patternCheck;

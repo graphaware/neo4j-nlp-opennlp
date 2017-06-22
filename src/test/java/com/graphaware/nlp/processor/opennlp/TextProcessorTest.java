@@ -66,6 +66,15 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
         checkVerb("show");
 
     }
+    
+    @Test
+    public void testLemmaLowerCasing() {
+        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
+        AnnotatedText annotateText = textProcessor.annotateText("Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset", 1, OpenNLPTextProcessor.TOKENIZER, "en", false, null);
+
+        assertEquals(1, annotateText.getSentences().size());
+        assertEquals("governance", annotateText.getSentences().get(0).getTagOccurrence(16).getLemma());
+    }
 
     private void checkLocation(String location) throws QueryExecutionException {
         try (Transaction tx = getDatabase().beginTx()) {
