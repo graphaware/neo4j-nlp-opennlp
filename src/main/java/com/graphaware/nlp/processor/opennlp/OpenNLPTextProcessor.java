@@ -171,7 +171,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
         Collection<OpenNLPAnnotation.Token> tokens = sentence.getTokens();
-        tokens.stream().filter((token) -> !(token == null || !checkPuntuation(token.getToken()))).forEach((token) -> {
+        tokens.stream().filter((token) -> !(token == null || !checkPunctuation(token.getToken()))).forEach((token) -> {
             Tag newTag = getTag(token, lang);
             Tag tagInSentence = newSentence.addTag(newTag);
             token.getTokenSpans().stream().forEach((span) -> {
@@ -223,7 +223,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 //        if (sentence.isPresent()) {
 //            Optional<Tag> oTag = sentence.get().get(CoreAnnotations.TokensAnnotation.class).stream()
 //                    .map((token) -> getTag(token))
-//                    .filter((tag) -> (tag != null) && checkPuntuation(tag.getLemma()))
+//                    .filter((tag) -> (tag != null) && checkPunctuation(tag.getLemma()))
 //                    .findFirst();
 //            if (oTag.isPresent()) {
 //                return oTag.get();
@@ -291,7 +291,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
         return null;
     }
 
-    public boolean checkPuntuation(String value) {
+    public boolean checkPunctuation(String value) {
         Matcher match = patternCheck.matcher(value);
         return !match.find();
     }
