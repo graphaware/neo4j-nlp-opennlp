@@ -16,10 +16,7 @@
 package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.annotation.NLPTextProcessor;
-import com.graphaware.nlp.domain.AnnotatedText;
-import com.graphaware.nlp.domain.Phrase;
-import com.graphaware.nlp.domain.Sentence;
-import com.graphaware.nlp.domain.Tag;
+import com.graphaware.nlp.domain.*;
 import com.graphaware.nlp.processor.TextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -511,6 +508,12 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
         OpenNLPPipeline pipeline = pipelineBuilder.build();
         pipelines.put(name, pipeline);
+    }
+
+    @Override
+    public List<PipelineInfo> getPipelineInfos() {
+        // @TODO implement this method
+        return new ArrayList<>();
     }
 
     @Override
