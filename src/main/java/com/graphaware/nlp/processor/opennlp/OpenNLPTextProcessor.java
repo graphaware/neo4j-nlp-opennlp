@@ -17,14 +17,13 @@ package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.annotation.NLPTextProcessor;
 import com.graphaware.nlp.domain.*;
-import com.graphaware.nlp.processor.TextProcessor;
+import com.graphaware.nlp.processor.AbstractTextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Optional;
 import opennlp.tools.util.Span;
@@ -32,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @NLPTextProcessor(name = "OpenNLPTextProcessor")
-public class OpenNLPTextProcessor implements TextProcessor {
+public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
     public static final String TOKENIZER = "tokenizer";
@@ -41,17 +40,14 @@ public class OpenNLPTextProcessor implements TextProcessor {
     public static final String PHRASE = "phrase";
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
-    private final Pattern patternCheck;
 
     public OpenNLPTextProcessor() {
+        super();
         //Creating default pipelines
         createTokenizerPipeline();
         createSentimentPipeline();
         createTokenizerAndSentimentPipeline();
         createPhrasePipeline();
-
-        String pattern = "\\p{Punct}";
-        patternCheck = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE);
     }
 
     private void createTokenizerPipeline() {
@@ -168,7 +164,7 @@ public class OpenNLPTextProcessor implements TextProcessor {
 
     private void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
         Collection<OpenNLPAnnotation.Token> tokens = sentence.getTokens();
-        tokens.stream().filter((token) -> !(token == null || !checkPunctuation(token.getToken()))).forEach((token) -> {
+        tokens.stream().filter((token) -> !(token == null || !checkLemmaIsValid(token.getToken()))).forEach((token) -> {
             Tag newTag = getTag(token, lang);
             Tag tagInSentence = newSentence.addTag(newTag);
             token.getTokenSpans().stream().forEach((span) -> {
@@ -286,11 +282,6 @@ public class OpenNLPTextProcessor implements TextProcessor {
             }            
         }
         return null;
-    }
-
-    public boolean checkPunctuation(String value) {
-        Matcher match = patternCheck.matcher(value);
-        return !match.find();
     }
 
     @Override
