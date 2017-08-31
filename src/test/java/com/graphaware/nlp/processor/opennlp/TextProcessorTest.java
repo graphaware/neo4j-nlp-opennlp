@@ -18,11 +18,12 @@ package com.graphaware.nlp.processor.opennlp;
 import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
-import com.graphaware.nlp.persistence.GraphPersistence;
-import com.graphaware.nlp.persistence.LocalGraphDatabase;
 import com.graphaware.nlp.processor.TextProcessor;
 import com.graphaware.nlp.util.ServiceLoader;
+import com.graphaware.nlp.util.TestAnnotatedText;
 import com.graphaware.test.integration.EmbeddedDatabaseIntegrationTest;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.Test;
@@ -31,6 +32,8 @@ import org.neo4j.graphdb.QueryExecutionException;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
+
+import static com.graphaware.nlp.util.TagUtils.newTag;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -42,7 +45,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     @Test
     public void testAnnotatedText() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        AnnotatedText annotateText = textProcessor.annotateText("On 8 May 2013, "
+        AnnotatedText annotatedText = textProcessor.annotateText("On 8 May 2013, "
                 + "one week before the Pakistani election, the third author, "
                 + "in his keynote address at the Sentiment Analysis Symposium, "
                 + "forecast the winner of the Pakistani election. The chart "
@@ -52,25 +55,30 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
                 + "an article titled “Pakistan Elections: Five Reasons Why the "
                 + "Vote is Unpredictable,”1 in which he claimed that the election "
                 + "was too close to call. It was not, and despite his being in Pakistan, "
-                + "the outcome of the election was exactly as we predicted.", 1, 0, "en", false);
+                + "the outcome of the election was exactly as we predicted.", "tokenizer", "en", null);
 
-        assertEquals(4, annotateText.getSentences().size());
-        assertEquals(13, annotateText.getSentences().get(0).getTags().size());
-        assertEquals(11, annotateText.getSentences().get(1).getTags().size());
-        assertEquals(21, annotateText.getSentences().get(2).getTags().size());
-        assertEquals(8, annotateText.getSentences().get(3).getTags().size());
+        assertEquals(4, annotatedText.getSentences().size());
+        assertEquals(13, annotatedText.getSentences().get(0).getTags().size());
+        assertEquals(11, annotatedText.getSentences().get(1).getTags().size());
+        assertEquals(21, annotatedText.getSentences().get(2).getTags().size());
+        assertEquals(8, annotatedText.getSentences().get(3).getTags().size());
 
-        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
-        peristence.persistOnGraph(annotateText, false);
-        checkLocation("pakistan");
-        checkVerb("show");
+        TestAnnotatedText test = new TestAnnotatedText(annotatedText);
+        test.assertSentencesCount(4);
+        test.assertTagsCountInSentence(15, 0);
+        test.assertTagsCountInSentence(11, 1);
+        test.assertTagsCountInSentence(24, 2);
+        test.assertTagsCountInSentence(9, 3);
+
+        test.assertTag(newTag("Pakistan", Collections.singletonList("LOCATION"), Collections.emptyList()));
+        test.assertTag(newTag("show", Collections.emptyList(), Collections.singletonList("VBZ")));
 
     }
     
     @Test
     public void testLemmaLowerCasing() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        AnnotatedText annotateText = textProcessor.annotateText("Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset", 1, OpenNLPTextProcessor.TOKENIZER, "en", false, null);
+        AnnotatedText annotateText = textProcessor.annotateText("Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset", OpenNLPTextProcessor.TOKENIZER, "en", null);
 
         assertEquals(1, annotateText.getSentences().size());
         assertEquals("governance", annotateText.getSentences().get(0).getTagOccurrence(16).getLemma());
@@ -144,23 +152,23 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     public void testSentiment() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
 
-        AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again", 1, 1, "en", false);
+        AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(0, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("It was really horrible to study at Stanford", 1, 1, "en", false);
+        annotateText = textProcessor.annotateText("It was really horrible to study at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(1, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I studied at Stanford", 1, 1, "en", false);
+        annotateText = textProcessor.annotateText("I studied at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(2, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked to study at Stanford", 1, 1, "en", false);
+        annotateText = textProcessor.annotateText("I liked to study at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(3, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body", 1, 1, "en", false);
+        annotateText = textProcessor.annotateText("I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(4, annotateText.getSentences().get(0).getSentiment());
     }
@@ -178,7 +186,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
                 + "an article titled “Pakistan Elections: Five Reasons Why the "
                 + "Vote is Unpredictable,”1 in which he claimed that the election "
                 + "was too close to call. It was not, and despite his being in Pakistan, "
-                + "the outcome of the election was exactly as we predicted.", 1, "phrase", "en", false, null);
+                + "the outcome of the election was exactly as we predicted.",  "phrase", "en", null);
 
         assertEquals(4, annotateText.getSentences().size());
         Sentence sentence1 = annotateText.getSentences().get(0);
@@ -206,21 +214,21 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     @Test
     public void testAnnotatedShortText() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem", 1, 1, "en", false);
+        AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem",  OpenNLPTextProcessor.TOKENIZER, "en", null);
 
         assertEquals(1, annotateText.getSentences().size());
-
-        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
-        peristence.persistOnGraph(annotateText, false);
+//
+//        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
+//        peristence.persistOnGraph(annotateText, false);
 
     }
 
     @Test
     public void testAnnotatedShortText2() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing", 1, 1, "en", false);
+        AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing",  OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
-        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
-        peristence.persistOnGraph(annotateText, false);
+//        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
+//        peristence.persistOnGraph(annotateText, false);
     }
 }

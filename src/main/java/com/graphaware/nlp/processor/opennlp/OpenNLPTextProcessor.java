@@ -17,6 +17,7 @@ package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.annotation.NLPTextProcessor;
 import com.graphaware.nlp.domain.*;
+import com.graphaware.nlp.dsl.PipelineSpecification;
 import com.graphaware.nlp.processor.AbstractTextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.Optional;
+
+import com.graphaware.nlp.processor.PipelineInfo;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +44,29 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
 
-    public OpenNLPTextProcessor() {
-        super();
-        //Creating default pipelines
+    private boolean initiated = false;
+
+    @Override
+    public void init() {
+        if (initiated) {
+            return;
+        }
         createTokenizerPipeline();
         createSentimentPipeline();
         createTokenizerAndSentimentPipeline();
         createPhrasePipeline();
+
+        initiated = true;
+    }
+
+    @Override
+    public String getAlias() {
+        return "opennlp";
+    }
+
+    @Override
+    public String override() {
+        return null;
     }
 
     private void createTokenizerPipeline() {
@@ -90,26 +109,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     }
 
     @Override
-    public AnnotatedText annotateText(String text, Object id, int level, String lang, boolean store) {
-        String pipeline;
-        switch (level) {
-            case 0:
-                pipeline = TOKENIZER;
-                break;
-            case 1:
-                pipeline = TOKENIZER_AND_SENTIMENT;
-                break;
-            case 2:
-                pipeline = PHRASE;
-                break;
-            default:
-                pipeline = TOKENIZER;
-        }
-        return annotateText(text, id, pipeline, lang, store, null);
-    }
-
-    @Override
-    public AnnotatedText annotateText(String text, Object id, String name, String lang, boolean store, Map<String, String> otherParams) {
+    public AnnotatedText annotateText(String text, String name, String lang, Map<String, String> otherParams) {
         if (name.length() == 0) {
             name = TOKENIZER;
             LOG.info("Using default pipeline: " + name);
@@ -120,15 +120,15 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         }
         OpenNLPAnnotation document = new OpenNLPAnnotation(text, otherParams);
         pipeline.annotate(document);
-        LOG.info("Annotation for id " + id + " finished.");
+//        LOG.info("Annotation for id " + id + " finished.");
 
-        AnnotatedText result = new AnnotatedText(id);
+        AnnotatedText result = new AnnotatedText();
         List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
         final AtomicInteger sentenceSequence = new AtomicInteger(0);
         sentences.stream().forEach((sentence) -> {
             int sentenceNumber = sentenceSequence.getAndIncrement();
-            String sentenceId = id + "_" + sentenceNumber;
-            final Sentence newSentence = new Sentence(sentence.getSentence(), store, sentenceId, sentenceNumber);
+//            String sentenceId = id + "_" + sentenceNumber;
+            final Sentence newSentence = new Sentence(sentence.getSentence(), sentenceNumber);
             extractTokens(lang, sentence, newSentence);
             extractSentiment(sentence, newSentence);
             extractPhrases(sentence, newSentence);
@@ -277,23 +277,23 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 tokens.stream().forEach((token) -> {
                     Tag newTag = getTag(token, lang);
                     result.add(newTag);
-                });                
+                });
                 return result;
-            }            
+            }
         }
         return null;
     }
 
     @Override
-    public AnnotatedText sentiment(AnnotatedText annotated, Map<String, String> otherParams) {
+    public AnnotatedText sentiment(AnnotatedText annotated) {
         OpenNLPPipeline pipeline = pipelines.get(SENTIMENT);
         if (pipeline == null) {
             throw new RuntimeException("Pipeline: " + SENTIMENT + " doesn't exist");
         }
         annotated.getSentences().stream().forEach(item -> { // don't use parallelStream(), it crashes with the current content of the body
-            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence(), otherParams);
+            OpenNLPAnnotation document = new OpenNLPAnnotation(item.getSentence());
             pipeline.annotate(document);
-            
+
             List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
             Optional<OpenNLPAnnotation.Sentence> sentence = sentences.stream().findFirst();
             if (sentence != null && sentence.isPresent()) {
@@ -469,32 +469,37 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     }
 
     @Override
-    public void createPipeline(Map<String, Object> pipelineSpec) {
+    public void createPipeline(PipelineSpecification pipelineSpecification) {
         //TODO add validation
-        String name = (String) pipelineSpec.get("name");
+        String name = pipelineSpecification.getName();
         PipelineBuilder pipelineBuilder = new PipelineBuilder();
+        List<String> specActive = new ArrayList<>();
+        List<String> stopwordsList;
 
-        if ((Boolean) pipelineSpec.getOrDefault("tokenize", true)) {
+        if (pipelineSpecification.hasProcessingStep("tokenize", true)) {
             pipelineBuilder.tokenize();
+            specActive.add("tokenize");
         }
 
-        String stopWords = (String) pipelineSpec.getOrDefault("stopWords", "default");
-        if (stopWords.equalsIgnoreCase("default")) {
-            pipelineBuilder.defaultStopWordAnnotator();
-        } else {
-            pipelineBuilder.customStopWordAnnotator(stopWords);
+        String stopWords = pipelineSpecification.getStopwords() != null ? pipelineSpecification.getStopwords() : "default";
+        boolean checkLemma = pipelineSpecification.hasProcessingStep("checkLemmaIsStopWord");
+        if (checkLemma) {
+            specActive.add("checkLemmaIsStopWord");
         }
 
-        if ((Boolean) pipelineSpec.getOrDefault("sentiment", false)) {
+        if (pipelineSpecification.hasProcessingStep("sentiment")) {
             pipelineBuilder.extractSentiment();
+            specActive.add("sentiment");
         }
-        if ((Boolean) pipelineSpec.getOrDefault("coref", false)) {
+        if (pipelineSpecification.hasProcessingStep("coref")) {
             pipelineBuilder.extractCoref();
+            specActive.add("coref");
         }
-        if ((Boolean) pipelineSpec.getOrDefault("relations", false)) {
+        if (pipelineSpecification.hasProcessingStep("relations")) {
             pipelineBuilder.extractRelations();
+            specActive.add("relations");
         }
-        Long threadNumber = (Long) pipelineSpec.getOrDefault("threadNumber", 4);
+        Long threadNumber = pipelineSpecification.getThreadNumber() != 0 ? pipelineSpecification.getThreadNumber() : 4L;
         pipelineBuilder.threadNumber(threadNumber.intValue());
 
         OpenNLPPipeline pipeline = pipelineBuilder.build();
@@ -503,7 +508,6 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     @Override
     public List<PipelineInfo> getPipelineInfos() {
-        // @TODO implement this method
         return new ArrayList<>();
     }
 
