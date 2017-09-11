@@ -25,7 +25,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 import java.util.Optional;
 
 import com.graphaware.nlp.processor.PipelineInfo;
@@ -44,7 +43,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     private final Map<String, OpenNLPPipeline> pipelines = new HashMap<>();
 
-    private boolean initiated = false;
+    protected boolean initiated = false;
 
     @Override
     public void init() {
@@ -481,7 +480,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
             specActive.add("tokenize");
         }
 
-        String stopWords = pipelineSpecification.getStopwords() != null ? pipelineSpecification.getStopwords() : "default";
+        String stopWords = pipelineSpecification.getStopWords() != null ? pipelineSpecification.getStopWords() : "default";
         boolean checkLemma = pipelineSpecification.hasProcessingStep("checkLemmaIsStopWord");
         if (checkLemma) {
             specActive.add("checkLemmaIsStopWord");
