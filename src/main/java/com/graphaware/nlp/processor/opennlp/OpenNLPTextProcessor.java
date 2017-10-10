@@ -17,7 +17,7 @@ package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.annotation.NLPTextProcessor;
 import com.graphaware.nlp.domain.*;
-import com.graphaware.nlp.dsl.PipelineSpecification;
+import com.graphaware.nlp.dsl.request.PipelineSpecification;
 import com.graphaware.nlp.processor.AbstractTextProcessor;
 import java.util.ArrayList;
 import java.util.HashMap;
