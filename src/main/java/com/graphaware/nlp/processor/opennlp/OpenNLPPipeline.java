@@ -593,4 +593,8 @@ public class OpenNLPPipeline {
         return new FileInputStream(this.inputSourceFile.getPath());
       }
     }*/
+
+    public Properties getProperties() {
+        return new Properties();//to be implemented
+    }
 }

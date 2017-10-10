@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Optional;
 
 import com.graphaware.nlp.processor.PipelineInfo;
+import java.util.Arrays;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +76,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER, pipeline);
+        pipelineInfos.put(TOKENIZER, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("tokenize")));
     }
 
     private void createSentimentPipeline() {
@@ -84,6 +86,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 .threadNumber(6)
                 .build();
         pipelines.put(SENTIMENT, pipeline);
+        pipelineInfos.put(SENTIMENT, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("sentiment")));
     }
 
     private void createTokenizerAndSentimentPipeline() {
@@ -94,6 +97,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
+        pipelineInfos.put(TOKENIZER_AND_SENTIMENT, createPipelineInfo(TOKENIZER_AND_SENTIMENT, pipeline, Arrays.asList("tokenize", "sentiment")));
     }
 
     private void createPhrasePipeline() {
@@ -105,6 +109,35 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 .threadNumber(6)
                 .build();
         pipelines.put(PHRASE, pipeline);
+        pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("phrase")));
+    }
+
+    protected PipelineInfo createPipelineInfo(String name, OpenNLPPipeline pipeline, List<String> actives) {
+        List<String> stopwords = PipelineBuilder.getDefaultStopwords();
+        PipelineInfo info = new PipelineInfo(name, this.getClass().getName(), getPipelineProperties(pipeline), buildSpecifications(actives), 6, stopwords);
+
+        return info;
+    }
+
+    protected Map<String, Object> getPipelineProperties(OpenNLPPipeline pipeline) {
+        Map<String, Object> options = new HashMap<>();
+        for (Object o : pipeline.getProperties().keySet()) {
+            if (o instanceof String) {
+                options.put(o.toString(), pipeline.getProperties().getProperty(o.toString()));
+            }
+        }
+
+        return options;
+    }
+    
+    protected Map<String, Boolean> buildSpecifications(List<String> actives) {
+        List<String> all = Arrays.asList("tokenize", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase");
+        Map<String, Boolean> specs = new HashMap<>();
+        all.forEach(s -> {
+            specs.put(s, actives.contains(s));
+        });
+
+        return specs;
     }
 
     @Override
@@ -507,7 +540,13 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     @Override
     public List<PipelineInfo> getPipelineInfos() {
-        return new ArrayList<>();
+        List<PipelineInfo> list = new ArrayList<>();
+
+        for (String k : pipelines.keySet()) {
+            list.add(pipelineInfos.get(k));
+        }
+
+        return list;
     }
 
     @Override
