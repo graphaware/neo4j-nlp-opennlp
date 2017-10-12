@@ -58,20 +58,14 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
                 + "was too close to call. It was not, and despite his being in Pakistan, "
                 + "the outcome of the election was exactly as we predicted.", OpenNLPTextProcessor.TOKENIZER, "en", null);
 
-        assertEquals(4, annotatedText.getSentences().size());
-        assertEquals(13, annotatedText.getSentences().get(0).getTags().size());
-        assertEquals(11, annotatedText.getSentences().get(1).getTags().size());
-        assertEquals(21, annotatedText.getSentences().get(2).getTags().size());
-        assertEquals(8, annotatedText.getSentences().get(3).getTags().size());
-
         TestAnnotatedText test = new TestAnnotatedText(annotatedText);
         test.assertSentencesCount(4);
-        test.assertTagsCountInSentence(13, 0);//(15, 0);
+        test.assertTagsCountInSentence(15, 0);
         test.assertTagsCountInSentence(11, 1);
-        test.assertTagsCountInSentence(21, 2);//(24, 2);
-        test.assertTagsCountInSentence(8, 3);//(9, 3);
+        test.assertTagsCountInSentence(22, 2);//(24, 2); // it's 22 because `"Pakistan` & `"1` are not lemmatized by OpenNLP and checkLemmaIsValid() removes non-lemmatized version because of symbols `"`
+        test.assertTagsCountInSentence(8, 3);//(9, 3); // it's 8 because OpenNLP has "be" among stopwords
 
-        //test.assertTag(newTag("Pakistan", Collections.singletonList("LOCATION"), Collections.emptyList()));
+        test.assertTag(newTag("pakistan", Collections.singletonList("LOCATION"), Collections.emptyList()));
         test.assertTag(newTag("show", Collections.emptyList(), Collections.singletonList("VBZ")));
 
     }
@@ -194,7 +188,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
         assertEquals(4, annotateText.getSentences().size());
         Sentence sentence1 = annotateText.getSentences().get(0);
-        assertEquals(13, sentence1.getTags().size());
+        assertEquals(15, sentence1.getTags().size());
 
         assertNull(sentence1.getTagOccurrence(0));
         assertEquals("8", sentence1.getTagOccurrence(3).getLemma());

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.graphaware.nlp.processor.PipelineInfo;
 import java.util.Arrays;
@@ -196,12 +197,14 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     private void extractTokens(String lang, OpenNLPAnnotation.Sentence sentence, final Sentence newSentence) {
         Collection<OpenNLPAnnotation.Token> tokens = sentence.getTokens();
-        tokens.stream().filter((token) -> !(token == null || !checkLemmaIsValid(token.getToken()))).forEach((token) -> {
+        tokens.stream().filter((token) -> token != null /*&& checkLemmaIsValid(token.getToken())*/).forEach((token) -> {
             Tag newTag = getTag(token, lang);
-            Tag tagInSentence = newSentence.addTag(newTag);
-            token.getTokenSpans().stream().forEach((span) -> {
-                newSentence.addTagOccurrence(span.getStart(), span.getEnd(), tagInSentence);
-            });
+            if (newTag != null) {
+                Tag tagInSentence = newSentence.addTag(newTag);
+                token.getTokenSpans().stream().forEach((span) -> {
+                    newSentence.addTagOccurrence(span.getStart(), span.getEnd(), tagInSentence);
+                });
+            }
         });
     }
 
@@ -287,6 +290,11 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         pos.addAll(token.getTokenPOS());
         ne.addAll(token.getTokenNEs());
 
+        // apply lemma validity check (to all words in case of NamedEntities)
+        lemma = Arrays.asList(lemma.split(" ")).stream().filter(str -> checkLemmaIsValid(str)).collect(Collectors.joining(" "));
+        if (lemma == null || lemma.length() == 0)
+            return null;
+
         Tag tag = new Tag(lemma, lang);
         tag.setPos(pos);
         tag.setNe(ne);
@@ -308,7 +316,8 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
             if (tokens != null && tokens.size() > 0) {
                 tokens.stream().forEach((token) -> {
                     Tag newTag = getTag(token, lang);
-                    result.add(newTag);
+                    if (newTag != null)
+                        result.add(newTag);
                 });
                 return result;
             }

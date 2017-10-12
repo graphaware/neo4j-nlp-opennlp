@@ -7,6 +7,7 @@ package com.graphaware.nlp.processor.opennlp;
 
 import com.graphaware.nlp.processor.opennlp.model.NERModelTool;
 import com.graphaware.nlp.processor.opennlp.model.SentimentModelTool;
+import com.graphaware.nlp.processor.AbstractTextProcessor;
 import static com.graphaware.nlp.processor.opennlp.OpenNLPAnnotation.DEFAULT_LEMMA_OPEN_NLP;
 import java.io.File;
 import java.io.FileInputStream;
@@ -401,12 +402,12 @@ public class OpenNLPPipeline {
                 ners.forEach(ne -> {
                     String value = "";
                     String lemma = "";
-                    String type = ne.getType();
+                    String type = ne.getType().toUpperCase();
                     Set<String> posSet = new HashSet<>();
                     int endSpan = startSpan;
                     for (int j = ne.getStart(); j < ne.getEnd(); j++) {
-                        value += " " + words[j];
-                        lemma += " " + (lemmas[j].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[j].toLowerCase() : lemmas[j]);
+                        value += " " + words[j].trim();
+                        lemma += " " + (lemmas[j].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[j].toLowerCase().trim() : lemmas[j].trim());
                         posSet.add(posTags[j]);
                         endSpan = wordSpans[j].getEnd();
                         if (index.get() < j) {
@@ -426,8 +427,8 @@ public class OpenNLPPipeline {
                 });
                 i = index.get();
             } else {
-                String value = words[i];
-                String lemma = lemmas[i].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[i].toLowerCase() : lemmas[i];
+                String value = words[i].trim();
+                String lemma = lemmas[i].equals(DEFAULT_LEMMA_OPEN_NLP) ? words[i].toLowerCase() : lemmas[i].trim();
                 String ne = DEFAULT_BACKGROUND_SYMBOL;
                 String pos = posTags[i];
                 Set<String> posSet = new HashSet<>();
