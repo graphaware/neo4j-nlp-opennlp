@@ -26,7 +26,13 @@ class PipelineBuilder {
 
     public PipelineBuilder tokenize() {
         checkForExistingAnnotators();
-        annotators.append("tokenize, pos, lemma, ner");
+        annotators.append("tokenize, pos, lemma");
+        return this;
+    }
+
+    public PipelineBuilder extractNEs() {
+        checkForExistingAnnotators();
+        annotators.append("ner");
         return this;
     }
 
@@ -90,5 +96,21 @@ class PipelineBuilder {
         });
 
         return stopwords;
+    }
+
+    public static List<String> getCustomStopwordsList(String customStopWordList) {
+        String stopWordList;
+        if (customStopWordList.startsWith("+")) {
+            stopWordList = CUSTOM_STOP_WORD_LIST + "," + customStopWordList.replace("+,", "").replace("+", "");
+        } else {
+            stopWordList = customStopWordList;
+        }
+
+        List<String> list = new ArrayList<>();
+        Arrays.stream(stopWordList.split(",")).forEach(s -> {
+            list.add(s.trim());
+        });
+
+        return list;
     }
 }

@@ -73,44 +73,49 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     private void createTokenizerPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
+                .extractNEs()
                 .defaultStopWordAnnotator()
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER, pipeline);
-        pipelineInfos.put(TOKENIZER, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("tokenize")));
+        pipelineInfos.put(TOKENIZER, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("tokenize", "ner")));
     }
 
     private void createSentimentPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
+                //.extractNEs()
                 .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(SENTIMENT, pipeline);
-        pipelineInfos.put(SENTIMENT, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("sentiment")));
+        pipelineInfos.put(SENTIMENT, createPipelineInfo(SENTIMENT, pipeline, Arrays.asList("sentiment")));
     }
 
     private void createTokenizerAndSentimentPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
+                .extractNEs()
                 .defaultStopWordAnnotator()
                 .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
-        pipelineInfos.put(TOKENIZER_AND_SENTIMENT, createPipelineInfo(TOKENIZER_AND_SENTIMENT, pipeline, Arrays.asList("tokenize", "sentiment")));
+        pipelineInfos.put(TOKENIZER_AND_SENTIMENT, createPipelineInfo(TOKENIZER_AND_SENTIMENT, pipeline, Arrays.asList("tokenize", "ner", "sentiment")));
     }
 
     private void createPhrasePipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
+                .extractNEs()
                 .defaultStopWordAnnotator()
                 .extractRelations()
                 .extractSentiment()
                 .threadNumber(6)
                 .build();
         pipelines.put(PHRASE, pipeline);
-        pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("phrase")));
+        //pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("phrase")));
+        pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("tokenize", "ner", "coref", "relations", "sentiment", "phrase")));
     }
 
     protected PipelineInfo createPipelineInfo(String name, OpenNLPPipeline pipeline, List<String> actives) {
@@ -132,7 +137,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     }
     
     protected Map<String, Boolean> buildSpecifications(List<String> actives) {
-        List<String> all = Arrays.asList("tokenize", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase");
+        List<String> all = Arrays.asList("tokenize", "ner", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase");
         Map<String, Boolean> specs = new HashMap<>();
         all.forEach(s -> {
             specs.put(s, actives.contains(s));
@@ -522,10 +527,23 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
             specActive.add("tokenize");
         }
 
+        if (pipelineSpecification.hasProcessingStep("ner", true)) {
+            pipelineBuilder.extractNEs();
+            specActive.add("ner");
+        }
+
         String stopWords = pipelineSpecification.getStopWords() != null ? pipelineSpecification.getStopWords() : "default";
         boolean checkLemma = pipelineSpecification.hasProcessingStep("checkLemmaIsStopWord");
         if (checkLemma) {
             specActive.add("checkLemmaIsStopWord");
+        }
+
+        if (stopWords.equalsIgnoreCase("default")) {
+            pipelineBuilder.defaultStopWordAnnotator();
+            stopwordsList = PipelineBuilder.getDefaultStopwords();
+        } else {
+            pipelineBuilder.customStopWordAnnotator(stopWords);
+            stopwordsList = PipelineBuilder.getCustomStopwordsList(stopWords);
         }
 
         if (pipelineSpecification.hasProcessingStep("sentiment")) {
@@ -545,6 +563,15 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
         OpenNLPPipeline pipeline = pipelineBuilder.build();
         pipelines.put(name, pipeline);
+        PipelineInfo pipelineInfo = new PipelineInfo(
+                name,
+                this.getClass().getName(),
+                getPipelineProperties(pipeline),
+                buildSpecifications(specActive),
+                Integer.valueOf(threadNumber.toString()),
+                stopwordsList
+        );
+        pipelineInfos.put(name, pipelineInfo);
     }
 
     @Override
