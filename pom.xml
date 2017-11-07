@@ -6,22 +6,22 @@
 
   <groupId>com.graphaware.neo4j</groupId>
   <artifactId>nlp-opennlp</artifactId>
-  <version>3.2.1.51.1</version>
+  <version>3.3.0.51.1</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <graphaware.version>3.2.1.51</graphaware.version>
-    <resttest.version>3.2.1.51.16</resttest.version>
-    <neo4j.version>3.2.1</neo4j.version>
+    <graphaware.version>3.3.0.51</graphaware.version>
+    <resttest.version>3.3.0.51.18</resttest.version>
+    <neo4j.version>3.3.0</neo4j.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>nlp</artifactId>
-      <version>3.2.1.51.1</version>
+      <version>3.3.0.51.1</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -81,7 +81,7 @@
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>nlp</artifactId>
-      <version>3.2.1.51.1</version>
+      <version>3.3.0.51.1</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
