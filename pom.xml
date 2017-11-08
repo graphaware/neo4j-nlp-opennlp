@@ -6,7 +6,7 @@
 
   <groupId>com.graphaware.neo4j</groupId>
   <artifactId>nlp-opennlp</artifactId>
-  <version>3.3.0.51.1</version>
+  <version>3.3.0.51.2-SNAPSHOT</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
