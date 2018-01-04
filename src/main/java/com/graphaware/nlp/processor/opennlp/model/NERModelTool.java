@@ -30,12 +30,12 @@ public class NERModelTool extends OpenNLPGenericModelTool {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
-    public NERModelTool(String fileIn, String modelDescr, String lang, Map<String, String> params) {
+    public NERModelTool(String fileIn, String modelDescr, String lang, Map<String, Object> params) {
         super(fileIn, modelDescr, lang, params);
         this.entityType = null; // train only specific named entity; null = train all entities present in the training set
         if (params != null) {
             if (params.containsKey(GenericModelParameters.TRAIN_ENTITYTYPE)) {
-                this.entityType = params.get(GenericModelParameters.TRAIN_ENTITYTYPE);
+                this.entityType = (String) params.get(GenericModelParameters.TRAIN_ENTITYTYPE);
             }
         }
     }

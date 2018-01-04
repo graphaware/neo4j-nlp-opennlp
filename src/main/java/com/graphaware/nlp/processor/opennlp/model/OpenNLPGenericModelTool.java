@@ -52,13 +52,13 @@ public class OpenNLPGenericModelTool {
         this.setDefParams();
     }
 
-    public OpenNLPGenericModelTool(String file, String modelDescr, String lang, Map<String, String> params) {
+    public OpenNLPGenericModelTool(String file, String modelDescr, String lang, Map<String, Object> params) {
         this(file, modelDescr, lang);
         this.setTrainingParameters(params);
     }
 
     /*
-     * This constructor needed for invoking test() method only (model is provided ar argument of train() )
+     * This constructor needed for invoking test() method only (model is provided as an argument of train() )
      */
     public OpenNLPGenericModelTool() {
         this(null, null, null);
@@ -85,7 +85,7 @@ public class OpenNLPGenericModelTool {
         return lStream;
     }
 
-    private void setTrainingParameters(Map<String, String> params) {
+    private void setTrainingParameters(Map<String, Object> params) {
         if (params == null) {
             return;
         }
@@ -94,28 +94,28 @@ public class OpenNLPGenericModelTool {
 
         // now add/override-by user-defined parameters
         if (params.containsKey(GenericModelParameters.TRAIN_ALG)) {
-            this.trainParams.put(TrainingParameters.ALGORITHM_PARAM, params.get(GenericModelParameters.TRAIN_ALG)); // default: MAXENT
-            LOG.info("Training parameter " + TrainingParameters.ALGORITHM_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_ALG));
+            this.trainParams.put(TrainingParameters.ALGORITHM_PARAM, (String) params.get(GenericModelParameters.TRAIN_ALG)); // default: MAXENT
+            LOG.info("Training parameter " + TrainingParameters.ALGORITHM_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_ALG));
         }
         if (params.containsKey(GenericModelParameters.TRAIN_TYPE)) {
-            this.trainParams.put(TrainingParameters.TRAINER_TYPE_PARAM, params.get(GenericModelParameters.TRAIN_TYPE));
+            this.trainParams.put(TrainingParameters.TRAINER_TYPE_PARAM, (String) params.get(GenericModelParameters.TRAIN_TYPE));
             LOG.info("Training parameter " + TrainingParameters.TRAINER_TYPE_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_TYPE));
         }
         if (params.containsKey(GenericModelParameters.TRAIN_CUTOFF)) {
-            this.trainParams.put(TrainingParameters.CUTOFF_PARAM, params.get(GenericModelParameters.TRAIN_CUTOFF));
-            LOG.info("Training parameter " + TrainingParameters.CUTOFF_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_CUTOFF));
+            this.trainParams.put(TrainingParameters.CUTOFF_PARAM, (String) params.get(GenericModelParameters.TRAIN_CUTOFF));
+            LOG.info("Training parameter " + TrainingParameters.CUTOFF_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_CUTOFF));
         }
         if (params.containsKey(GenericModelParameters.TRAIN_ITER)) {
-            this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, params.get(GenericModelParameters.TRAIN_ITER));
-            LOG.info("Training parameter " + TrainingParameters.ITERATIONS_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_ITER));
+            this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, (String) params.get(GenericModelParameters.TRAIN_ITER));
+            LOG.info("Training parameter " + TrainingParameters.ITERATIONS_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_ITER));
         }
         if (params.containsKey(GenericModelParameters.TRAIN_THREADS)) {
-            this.trainParams.put(TrainingParameters.THREADS_PARAM, params.get(GenericModelParameters.TRAIN_THREADS));
-            LOG.info("Training parameter " + TrainingParameters.THREADS_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_THREADS));
+            this.trainParams.put(TrainingParameters.THREADS_PARAM, (String) params.get(GenericModelParameters.TRAIN_THREADS));
+            LOG.info("Training parameter " + TrainingParameters.THREADS_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_THREADS));
         }
         if (params.containsKey(GenericModelParameters.VALIDATE_FOLDS)) {
             try {
-                this.nFolds = Integer.parseInt(params.get(GenericModelParameters.VALIDATE_FOLDS));
+                this.nFolds = Integer.parseInt((String) params.get(GenericModelParameters.VALIDATE_FOLDS));
             } catch (Exception ex) {
                 LOG.warn("Wrong specification of argument " + GenericModelParameters.VALIDATE_FOLDS + ", using default.");
             }
@@ -123,7 +123,7 @@ public class OpenNLPGenericModelTool {
         }
         if (params.containsKey(GenericModelParameters.VALIDATE_FILE)) {
             this.fileValidate = (String) params.get(GenericModelParameters.VALIDATE_FILE);
-            LOG.info("Using valudation file " + params.get(GenericModelParameters.VALIDATE_FILE));
+            LOG.info("Using valudation file " + fileValidate);
         }
     }
 

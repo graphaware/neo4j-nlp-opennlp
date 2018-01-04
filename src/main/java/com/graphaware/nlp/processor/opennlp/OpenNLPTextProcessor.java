@@ -351,22 +351,22 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     }
 
     @Override
-    public String train(String project, String alg, String model, String file, String lang, Map<String, String> params) {
-        // training could be done directly here, but it's better to have everything model-implementation related in one class, therefore ...
+    public String train(String alg, String modelId, String file, String lang, Map<String, Object> params) {
+        // training could be done directly here, but it's better to have everything related to model implementation in one class, therefore ...
         OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
         if (pipeline == null) {
             throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
-        return pipeline.train(project, alg, model, file, lang, params);
+        return pipeline.train(alg, modelId, file, lang, params);
     }
 
     @Override
-    public String test(String project, String alg, String model, String file, String lang) {
+    public String test(String alg, String modelId, String file, String lang) {
         OpenNLPPipeline pipeline = pipelines.get(TOKENIZER);
         if (pipeline == null) {
             throw new RuntimeException("Pipeline: " + TOKENIZER + " doesn't exist");
         }
-        return pipeline.test(project, alg, model, file, lang);
+        return pipeline.test(alg, modelId, file, lang);
 
     }
 

@@ -326,14 +326,13 @@ public class OpenNLPPipeline {
         }
     }
 
-    public String train(String project, String alg, String model_str, String fileTrain, String lang, Map<String, String> params) {
-        String proj = project.toLowerCase();
-        String fileOut = createModelFileName(lang, alg, model_str, proj);
-        String newKey = proj + "-" + model_str;
+    public String train(String alg, String modelId, String fileTrain, String lang, Map<String, Object> params) {
+        String fileOut = createModelFileName(lang, alg, modelId);
+        String newKey = modelId.toLowerCase();
         String result = "";
 
         if (alg.toLowerCase().equals("ner")) {
-            NERModelTool nerModel = new NERModelTool(fileTrain, model_str, lang, params);
+            NERModelTool nerModel = new NERModelTool(fileTrain, modelId, lang, params);
             nerModel.train();
             result = nerModel.validate();
             nerModel.saveModel(fileOut);
@@ -344,25 +343,26 @@ public class OpenNLPPipeline {
                     nameDetectors.put(newKey, new NameFinderME((TokenNameFinderModel) nerModel.getModel()));
                 }
             }
-        } else if (alg.toLowerCase().equals("sentiment")) {
-            SentimentModelTool sentModel = new SentimentModelTool(fileTrain, model_str, lang, params);
+        }
+        else if (alg.toLowerCase().equals("sentiment")) {
+            SentimentModelTool sentModel = new SentimentModelTool(fileTrain, modelId, lang, params);
             sentModel.train();
             result = sentModel.validate();
             sentModel.saveModel(fileOut);
             // incorporate this model to the OpenNLPPipeline
             if (sentModel.getModel() != null) {
-                customSentimentModels.put(proj, fileOut);
-                sentimentDetectors.put(proj, new DocumentCategorizerME((DoccatModel) sentModel.getModel()));
+                customSentimentModels.put(newKey, fileOut);
+                sentimentDetectors.put(newKey, new DocumentCategorizerME((DoccatModel) sentModel.getModel()));
             }
         } else {
             throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
         }
+
         return result;
     }
 
-    public String test(String project, String alg, String model_str, String file, String lang) {
-        String proj = project.toLowerCase();
-        String modelID = proj + "-" + model_str;
+    public String test(String alg, String modelId, String file, String lang) {
+        String modelID = modelId.toLowerCase();
         String result = "failure";
 
         if (alg.toLowerCase().equals("ner")) {
@@ -371,14 +371,15 @@ public class OpenNLPPipeline {
             NERModelTool nerModel = new NERModelTool();
             result = nerModel.test(file, nameDetectors.get(modelID));
           } else
-            LOG.error("Required NER model doesn't exist: project = " + project + ", model = " + model_str);
-        } else if (alg.toLowerCase().equals("sentiment")) {
+            LOG.error("Required NER model doesn't exist: " + modelID);
+        }
+        else if (alg.toLowerCase().equals("sentiment")) {
           if (sentimentDetectors.containsKey(modelID)) {
             LOG.info("Testing sentiment model: " + modelID);
             SentimentModelTool sentModel = new SentimentModelTool();
             result = sentModel.test(file, sentimentDetectors.get(modelID));
           } else
-            LOG.error("Required sentiment model doesn't exist: project = " + project);
+            LOG.error("Required sentiment model doesn't exist: " + modelID);
         } else {
             throw new UnsupportedOperationException("Undefined training procedure for algorithm " + alg);
         }
@@ -554,7 +555,7 @@ public class OpenNLPPipeline {
         return;
     }
 
-    private String createModelFileName(String lang, String alg, String model, String project) {
+    private String createModelFileName(String lang, String alg, String model) {
         String delim = "-";
         String name = "import/" + lang.toLowerCase() + delim + alg.toLowerCase();
         if (model != null) {
@@ -562,7 +563,7 @@ public class OpenNLPPipeline {
                 name += delim + model.toLowerCase();
             }
         }
-        name += delim + project.toLowerCase() + ".bin";
+        name += ".bin";
         return name;
     }
 

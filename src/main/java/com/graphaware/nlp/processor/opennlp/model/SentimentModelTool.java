@@ -51,10 +51,13 @@ import org.slf4j.LoggerFactory;
  */
 public class SentimentModelTool extends OpenNLPGenericModelTool {
 
-    private static final String MODEL_NAME = "sentiment";
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPPipeline.class);
 
-    public SentimentModelTool(String fileIn, String modelDescr, String lang, Map<String, String> params) {
+    private static final String MODEL_NAME = "sentiment";
+    private static final String DEFAULT_ITER = "30";
+    private static final String DEFAULT_CUTOFF = "2";
+
+    public SentimentModelTool(String fileIn, String modelDescr, String lang, Map<String, Object> params) {
         super(fileIn, modelDescr, lang, params);
     }
 
@@ -70,8 +73,8 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     @Override
     protected void setDefParams() {
         this.trainParams = TrainingParameters.defaultParams();
-        this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, "30");
-        this.trainParams.put(TrainingParameters.CUTOFF_PARAM, "2");
+        this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, DEFAULT_ITER);
+        this.trainParams.put(TrainingParameters.CUTOFF_PARAM, DEFAULT_CUTOFF);
     }
 
     public void train() {
@@ -85,7 +88,7 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     }
 
     public String validate() {
-        LOG.info("Starting validation of " + this.MODEL_NAME + " ...");
+        LOG.info("Starting validation of " + MODEL_NAME + " ...");
         String result = "";
         if (this.fileValidate == null) {
             try (ObjectStream<String> lineStream = openFile(fileIn); ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream)) {
@@ -98,7 +101,7 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
                 LOG.error("Error while opening training file: " + fileIn, e);
                 throw new RuntimeException("IOError while evaluating a " + MODEL_NAME + " model " + this.modelDescr, e);
             } catch (Exception ex) {
-                LOG.error("Error while evaluating " + this.MODEL_NAME + " model.", ex);
+                LOG.error("Error while evaluating " + MODEL_NAME + " model.", ex);
             }
         } else {
             // Using a separate .test file provided by user
@@ -109,7 +112,7 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     }
 
     public String test(String file, DocumentCategorizerME modelME) {
-        LOG.info("Starting testing of " + this.MODEL_NAME + " ...");
+        LOG.info("Starting testing of " + MODEL_NAME + " ...");
         String result = "";
         try (ObjectStream<String> lineStream = openFile(file); ObjectStream<DocumentSample> sampleStreamValidate = new DocumentSampleStream(lineStream)) {
             //DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(new DocumentCategorizerME((DoccatModel) this.model));
@@ -121,7 +124,7 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
             LOG.error("Error while opening a test file: " + file, e);
             throw new RuntimeException("IOError while testing a " + MODEL_NAME + " model " + this.modelDescr, e);
         } catch (Exception ex) {
-            LOG.error("Error while testing " + this.MODEL_NAME + " model.", ex);
+            LOG.error("Error while testing " + MODEL_NAME + " model.", ex);
         }
         return result;
     }
