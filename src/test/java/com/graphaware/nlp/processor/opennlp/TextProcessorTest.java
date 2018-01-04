@@ -69,7 +69,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
         test.assertTag(newTag("show", Collections.emptyList(), Collections.singletonList("VBZ")));
 
     }
-    
+
     @Test
     public void testLemmaLowerCasing() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
@@ -149,23 +149,23 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     public void testSentiment() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
 
-        AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(0, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("It was really horrible to study at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("It was really horrible to study at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(1, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I studied at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("I studied at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(2, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked to study at Stanford",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("I liked to study at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(3, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(4, annotateText.getSentences().get(0).getSentiment());
     }
@@ -184,7 +184,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
                 + "an article titled “Pakistan Elections: Five Reasons Why the "
                 + "Vote is Unpredictable,”1 in which he claimed that the election "
                 + "was too close to call. It was not, and despite his being in Pakistan, "
-                + "the outcome of the election was exactly as we predicted.",  "phrase", "en", null);
+                + "the outcome of the election was exactly as we predicted.", "phrase", "en", null);
 
         assertEquals(4, annotateText.getSentences().size());
         Sentence sentence1 = annotateText.getSentences().get(0);
@@ -192,12 +192,18 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
         assertNull(sentence1.getTagOccurrence(0));
         assertEquals("8", sentence1.getTagOccurrence(3).getLemma());
+        assertEquals("may 2013", sentence1.getTagOccurrence(5).getLemma());
+        assertEquals("May 2013", sentence1.getTagOccurrences().get(5).get(0).getValue());
         assertEquals("one", sentence1.getTagOccurrence(15).getLemma());
         assertEquals("before", sentence1.getTagOccurrence(24).getLemma());
         assertEquals("third", sentence1.getTagOccurrence(59).getLemma());
         //assertEquals("sentiment analysis symposium", sentence1.getTagOccurrence(103).getLemma());
         assertEquals("forecast", sentence1.getTagOccurrence(133).getLemma());
         assertNull(sentence1.getTagOccurrence(184));
+
+        Sentence sentence2 = annotateText.getSentences().get(1);
+        assertEquals("show", sentence2.getTagOccurrence(22).getLemma());
+        assertEquals("shows", sentence2.getTagOccurrences().get(22).get(0).getValue());
 //        assertTrue(sentence1.getPhraseOccurrence(99).contains(new Phrase("the Sentiment Analysis Symposium")));
 //        assertTrue(sentence1.getPhraseOccurrence(103).contains(new Phrase("Sentiment")));
 //        assertTrue(sentence1.getPhraseOccurrence(113).contains(new Phrase("Analysis")));
@@ -213,7 +219,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     public void testAnnotatedShortText() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
         textProcessor.init();
-        AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem", OpenNLPTextProcessor.TOKENIZER, "en", null);
 
         assertEquals(1, annotateText.getSentences().size());
 //
@@ -226,7 +232,7 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
     public void testAnnotatedShortText2() {
         TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
         textProcessor.init();
-        AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing",  OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
 //        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
 //        peristence.persistOnGraph(annotateText, false);

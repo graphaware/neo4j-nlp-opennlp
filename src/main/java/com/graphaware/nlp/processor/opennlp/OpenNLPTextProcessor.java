@@ -207,7 +207,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
             if (newTag != null) {
                 Tag tagInSentence = newSentence.addTag(newTag);
                 token.getTokenSpans().stream().forEach((span) -> {
-                    newSentence.addTagOccurrence(span.getStart(), span.getEnd(), tagInSentence);
+                    newSentence.addTagOccurrence(span.getStart(), span.getEnd(), token.getToken(), tagInSentence);
                 });
             }
         });
