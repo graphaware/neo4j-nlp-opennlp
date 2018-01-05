@@ -68,15 +68,13 @@ RETURN labels(s) as labels
 ### Customizing pipeline models
 To add new customized model (currenlty NER and Sentiment), one can do it via Cypher:
 ```
-CALL ga.nlp.train({[project: "myXYProject",] alg: "NER", model: "component", file: "<path_to_your_training_file>" [, lang: "en", ...<training-parameters-of-choice>...]})
+CALL ga.nlp.train({textProcessor: "com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor", modelIdentifier: "component-en", alg: "sentiment", inputFile: "<path_to_your_training_file>" [, lang: "en", trainingParameters: {...<training-parameters-of-choice>...}]})
 ```
-  * `project` (case insensitive) is an arbitrary string that allows to specify in the `annotate()` procedure that we want, apart from the default models, to use also the custom model(s) associated with `project`
   * `alg` (case insensitive) specifies which algorithm is about to be trained; currently available algs: `NER`, `sentiment`
-  * `model` is an arbitrary string that provides, in combination with `alg` (and with `project` if it's specified), a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
-  * `file` is path to the training data file
-  * `validationFile` is path to the validation/test data file (if not specified, cross-validation method is used, see paragraph *Validation*)
+  * `modelIdentifier` is an arbitrary string that provides a unique identifier of the model that you want to train (will be used for e.g. saving it into .bin file)
+  * `inputFile` is path to the training data file
   * `lang` (default is "en") specifies the language
-  * `textProcessor` (optional) - for details see description in parent package (*neo4j-nlp*)
+  * `textProcessor` - desired text processor
   * **training parameters** (defined in `com.graphaware.nlp.util.GenericModelParameters`) are optional and are not universal (some might be specific to only certain Text Processor):
     * *iter* - number of iterations
     * *cutoff* - useful for reducing the size of n-gram models, it's a threashold for n-gram occurrences/frequences in the training dataset
@@ -86,11 +84,30 @@ CALL ga.nlp.train({[project: "myXYProject",] alg: "NER", model: "component", fil
     * *trainerAlg* - specific for OpenNLP
     * *trainerType* - specific for OpenNLP
 
-The trained model is saved to a binary file in Neo4j's `import/` directory with name format: `<lang>-<alg>-<model>-<project>.bin`. Each time Neo4j starts, this directory is scanned for files (models) in this format, i.e. you don't need to train the same model again when you restart Neo4j.
-  * `NER` - default models (Person, Location, Organization, Date, Time, Money, Percentage) plus all registered customized models (assigned to specified `project`) are used when invoking `ga.nlp.annotate()` (see example below)
-  * `Sentiment` - sentiment analysis is run only once (user-trained one has a priority over the default one); if more custom models are provided, the latest one (or the last one in the list in `import/` directory) is used
+The trained model is saved to a binary file in Neo4j's `import/` directory with name format: `<alg>-<modelIdentifier>.bin`, so no need to train the same model again when you restart Neo4j. Cross-validation method is used to evaluate the model, see paragraph *Validation*.
+  * `NER` - default models (Person, Location, Organization, Date, Time, Money, Percentage) plus all registered customized models are used when invoking `ga.nlp.annotate()` (see example below)
+  * `Sentiment` - sentiment analysis is run only once (user-trained one has a priority over the default one)
+
+**Training/testing example:**
+Trainig:
+```
+CALL ga.nlp.processor.train({textProcessor: "com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor", modelIdentifier: "test", alg: "sentiment", inputFile: "/Users/doctor-who/Documents/workspace/datasets/sentiment_tweets.train", trainingParameters: {iter: 10}})
+```
+
+Testing the new model:
+```
+CALL ga.nlp.processor.test({textProcessor: "com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor", modelIdentifier: "test", alg: "sentiment", inputFile: "/Users/doctor-who/Documents/workspace/datasets/sentiment_tweets.test})
+```
 
 **Usage of new models:**
+To use custom models, one needs to assign them to a pipeline, for example:
+
+```
+CALL ga.nlp.processor.addPipeline({textProcessor: 'com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor', name: 'customPipeline', processingSteps: {tokenize: true, ner: true, dependency: false, customSentiment: <modelIdentifier>}})
+```
+  * `customSentiment` - string value wich is the identifier that you chose for your custom model
+  * `customNER` - string value which is the identifier that you chose for your custom model; if you want to use more models, separate them by ",", for example: `customNER: "component-en,chemical-en,testing-model"`
+
 ```
 # Example of a text to analyze
 CREATE (l:Lesson {lesson: "Power system distribution at Kennedy Space Center (KSC) consists primarily of high-voltage, underground cables. These cables include approximately 5000 splices.ľ Splice failures result in arc flash events that are extremely hazardous to personnel in the vicinity of the arc flash. Some construction and maintenance tasks cannot be performed effectively in the required personal protective equipment (PPE), and de-energizing the cables is not feasible due to cost, lost productivity, and safety risk to others implementing the required outages. To verify alternate and effective mitigations, arc flash testing was conducted in a controlled environment. The arc flash effects were greater than expected. Testing also demonstrated the addition of neutral grounding resistors (NGRs) would result in substantial reductions to arc flash effects. As a result, NGRs are being installed on KSC primary substation transformers. The presence of the NGRs, enable usage of less cumbersome PPE.  Laboratory testing revealed higher than anticipated safety risks from a potential arc-flash event in a manhole environment when conducted at KSCęs unreduced fault current levels.ľ The safety risks included bright flash, excessive sound, and smoke.ľľ Due to these findings and absence of other mitigations installed at the time, manhole entries require full arc-flash PPE.ľ Furthermore, manhole entries were temporarily restricted to short duration inspections until further mitigations could be implemented.ľ With installation of neutral grounding resistors (NGRs) on substation transformers, the flash, sound and flame energy was reduced.ľ The hazard reduction was so substantial that the required PPE would be less cumbersome and enable effective performance of maintenance tasks in the energized configuration."})
@@ -98,7 +115,7 @@ CREATE (l:Lesson {lesson: "Power system distribution at Kennedy Space Center (KS
 WITH l
 
 # Annotate it and use newly trained NER model(s)
-CALL ga.nlp.annotate({text:l.lesson, id: l.uuid, customProject: "myXYProject"}) YIELD result
+CALL ga.nlp.annotate({text:l.lesson, id: l.uuid, pipeline: "customPipeline"}) YIELD result
 MERGE (l)-[:HAS_ANNOTATED_TEXT]->(result)
 RETURN l, result;
 ```
@@ -129,7 +146,7 @@ RETURN l, result;
 
 **Validation/testing:**
 
-Evaluation of the new model is performed automatically when invoking procedure `ga.nlp.train()`. If `validationFile` is specified, it is used to test the performance of the new model. If not, evaluation is performed using OpenNLP cross-validation method: validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the sample size ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.
+Evaluation of the new model is performed automatically when invoking procedure `ga.nlp.train()`. The evaluation of the new model is performed using OpenNLP cross-validation method: validation runs *n*-fold times on the same training file, but each time selecting different set of trainig and testing data with the sample size ratio of *train:test = (n-1):1*. Validation measures (Precision, Recall, F-Measure) are pooled together and returned to the user as a result.
 
 The following procedure can be invoked to test already existing models:
 ```
