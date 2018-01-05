@@ -137,7 +137,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
     }
     
     protected Map<String, Boolean> buildSpecifications(List<String> actives) {
-        List<String> all = Arrays.asList("tokenize", "ner", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase");
+        List<String> all = Arrays.asList("tokenize", "ner", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase", "customSentiment", "customNER");
         Map<String, Boolean> specs = new HashMap<>();
         all.forEach(s -> {
             specs.put(s, actives.contains(s));
@@ -557,6 +557,22 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         if (pipelineSpecification.hasProcessingStep("relations")) {
             pipelineBuilder.extractRelations();
             specActive.add("relations");
+        }
+        if (pipelineSpecification.hasProcessingStep("customNER")) {
+            if (!specActive.contains("ner")) {
+                pipelineBuilder.extractNEs();
+                specActive.add("ner");
+            }
+            specActive.add("customNER");
+            pipelineBuilder.extractCustomNEs(pipelineSpecification.getProcessingStepAsString("customNER"));
+        }
+        if (pipelineSpecification.hasProcessingStep("customSentiment")) {
+            if (!specActive.contains("sentiment")) {
+                pipelineBuilder.extractSentiment();
+                specActive.add("sentiment");
+            }
+            specActive.add("customSentiment");
+            pipelineBuilder.extractCustomSentiment(pipelineSpecification.getProcessingStepAsString("customSentiment"));
         }
         Long threadNumber = pipelineSpecification.getThreadNumber() != 0 ? pipelineSpecification.getThreadNumber() : 4L;
         pipelineBuilder.threadNumber(threadNumber.intValue());

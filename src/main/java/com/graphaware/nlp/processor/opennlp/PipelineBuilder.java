@@ -52,6 +52,16 @@ class PipelineBuilder {
         return this;
     }
 
+    public PipelineBuilder extractCustomNEs(String ners) {
+        properties.setProperty("customNEs", ners);
+        return this;
+    }
+
+    public PipelineBuilder extractCustomSentiment(String sent) {
+        properties.setProperty("customSentiment", sent);
+        return this;
+    }
+
     public PipelineBuilder defaultStopWordAnnotator() {
         checkForExistingAnnotators();
         annotators.append("stopword");

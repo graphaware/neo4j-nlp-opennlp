@@ -56,13 +56,6 @@ public class OpenNLPAnnotation {
         }
         return DEFAULT_SENTIMENT_PROBTHR;
     }
-
-    public String getProject() {
-        if (otherParams != null) {
-            return otherParams.getOrDefault(OptionalNLPParameters.CUSTOM_PROJECT, null);
-        }
-        return null;
-    }
     
     public Token getToken(String token, String lemma) {
         return new Token(token, lemma);

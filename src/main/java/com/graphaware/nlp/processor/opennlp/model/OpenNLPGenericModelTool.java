@@ -71,7 +71,8 @@ public class OpenNLPGenericModelTool {
     }
 
     protected ObjectStream<String> openFile(String fileName) {
-        if (fileName == null) {
+        if (fileName == null || fileName.isEmpty()) {
+            LOG.error("File name is null or empty.");
             return null;
         }
         ObjectStream<String> lStream = null;
@@ -82,49 +83,79 @@ public class OpenNLPGenericModelTool {
             LOG.error("Failure while opening file " + fileName, ex);
             throw new RuntimeException("Failure while opening file " + fileName, ex);
         }
+
+        if (lStream == null)
+            throw new RuntimeException("Failure while opening file " + fileName + ": input stream is null.");
         return lStream;
     }
 
     private void setTrainingParameters(Map<String, Object> params) {
-        if (params == null) {
+        this.setDefParams();
+        if (params == null || params.isEmpty()) {
+            LOG.error("Map of parameters is null or empty. Using default values.");
             return;
         }
 
-        this.setDefParams();
-
         // now add/override-by user-defined parameters
         if (params.containsKey(GenericModelParameters.TRAIN_ALG)) {
-            this.trainParams.put(TrainingParameters.ALGORITHM_PARAM, (String) params.get(GenericModelParameters.TRAIN_ALG)); // default: MAXENT
-            LOG.info("Training parameter " + TrainingParameters.ALGORITHM_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_ALG));
+            String val = objectToString(params, GenericModelParameters.TRAIN_ALG);
+            this.trainParams.put(TrainingParameters.ALGORITHM_PARAM, val); // default: MAXENT
+            LOG.info("Training parameter " + TrainingParameters.ALGORITHM_PARAM + " set to " + val);
         }
         if (params.containsKey(GenericModelParameters.TRAIN_TYPE)) {
-            this.trainParams.put(TrainingParameters.TRAINER_TYPE_PARAM, (String) params.get(GenericModelParameters.TRAIN_TYPE));
-            LOG.info("Training parameter " + TrainingParameters.TRAINER_TYPE_PARAM + " set to " + params.get(GenericModelParameters.TRAIN_TYPE));
+            String val = objectToString(params, GenericModelParameters.TRAIN_TYPE);
+            this.trainParams.put(TrainingParameters.TRAINER_TYPE_PARAM, val);
+            LOG.info("Training parameter " + TrainingParameters.TRAINER_TYPE_PARAM + " set to " + val);
         }
         if (params.containsKey(GenericModelParameters.TRAIN_CUTOFF)) {
-            this.trainParams.put(TrainingParameters.CUTOFF_PARAM, (String) params.get(GenericModelParameters.TRAIN_CUTOFF));
-            LOG.info("Training parameter " + TrainingParameters.CUTOFF_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_CUTOFF));
+            String val = objectToString(params, GenericModelParameters.TRAIN_CUTOFF);
+            this.trainParams.put(TrainingParameters.CUTOFF_PARAM, val);
+            LOG.info("Training parameter " + TrainingParameters.CUTOFF_PARAM + " set to " + val);
         }
         if (params.containsKey(GenericModelParameters.TRAIN_ITER)) {
-            this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, (String) params.get(GenericModelParameters.TRAIN_ITER));
-            LOG.info("Training parameter " + TrainingParameters.ITERATIONS_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_ITER));
+            String val = objectToString(params, GenericModelParameters.TRAIN_ITER);
+            this.trainParams.put(TrainingParameters.ITERATIONS_PARAM, val);
+            LOG.info("Training parameter " + TrainingParameters.ITERATIONS_PARAM + " set to " + val);
         }
         if (params.containsKey(GenericModelParameters.TRAIN_THREADS)) {
-            this.trainParams.put(TrainingParameters.THREADS_PARAM, (String) params.get(GenericModelParameters.TRAIN_THREADS));
-            LOG.info("Training parameter " + TrainingParameters.THREADS_PARAM + " set to " + (String) params.get(GenericModelParameters.TRAIN_THREADS));
+            String val = objectToString(params, GenericModelParameters.TRAIN_THREADS);
+            this.trainParams.put(TrainingParameters.THREADS_PARAM, val);
+            LOG.info("Training parameter " + TrainingParameters.THREADS_PARAM + " set to " + val);
         }
         if (params.containsKey(GenericModelParameters.VALIDATE_FOLDS)) {
-            try {
-                this.nFolds = Integer.parseInt((String) params.get(GenericModelParameters.VALIDATE_FOLDS));
-            } catch (Exception ex) {
-                LOG.warn("Wrong specification of argument " + GenericModelParameters.VALIDATE_FOLDS + ", using default.");
-            }
+            this.nFolds = objectToInt(params, GenericModelParameters.VALIDATE_FOLDS);
             LOG.info("n-folds for crossvalidation set to %d.", this.nFolds);
         }
         if (params.containsKey(GenericModelParameters.VALIDATE_FILE)) {
-            this.fileValidate = (String) params.get(GenericModelParameters.VALIDATE_FILE);
+            this.fileValidate = objectToString(params, GenericModelParameters.VALIDATE_FILE);
             LOG.info("Using valudation file " + fileValidate);
         }
+    }
+
+    private String objectToString(Map<String, Object> params, String key) {
+        String result = null;
+        if (params.get(key) instanceof String)
+            result = (String) params.get(key);
+        else if (params.get(key) instanceof Long)
+            result = ((Long) params.get(key)).toString();
+        else if (params.get(key) instanceof Integer)
+            result = ((Integer) params.get(key)).toString();
+        else
+            throw new RuntimeException("Wrong format of parameter " + key);
+        return result;
+    }
+
+    private int objectToInt(Map<String, Object> params, String key) {
+        int result;
+        if (params.get(key) instanceof String)
+            result = Integer.parseInt((String) params.get(key));
+        else if (params.get(key) instanceof Long)
+            result = ((Long) params.get(key)).intValue();
+        else if (params.get(key) instanceof Integer)
+            result = ((Integer) params.get(key)).intValue();
+        else
+            throw new RuntimeException("Wrong format of parameter " + key);
+        return result;
     }
 
     protected void closeInputFiles() {
@@ -151,6 +182,7 @@ public class OpenNLPGenericModelTool {
             return;
         }
         try {
+            LOG.info("Saving model to file: " + file);
             BufferedOutputStream modelOut = new BufferedOutputStream(new FileOutputStream(file));
             this.model.serialize(modelOut);
             modelOut.close();

@@ -78,8 +78,8 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     }
 
     public void train() {
-        LOG.info("Starting training of " + MODEL_NAME + " ...");
         try (ObjectStream<String> lineStream = openFile(fileIn); ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream)) {
+            LOG.info("Training of " + MODEL_NAME + " started ...");
             this.model = DocumentCategorizerME.train("en", sampleStream, trainParams, new DoccatFactory());
         } catch (IOException e) {
             LOG.error("IOError while training a custom " + MODEL_NAME + " model " + modelDescr, e);
@@ -88,10 +88,10 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     }
 
     public String validate() {
-        LOG.info("Starting validation of " + MODEL_NAME + " ...");
         String result = "";
         if (this.fileValidate == null) {
             try (ObjectStream<String> lineStream = openFile(fileIn); ObjectStream<DocumentSample> sampleStream = new DocumentSampleStream(lineStream)) {
+                LOG.info("Validation of " + MODEL_NAME + " started ...");
                 DoccatCrossValidator evaluator = new DoccatCrossValidator(this.lang, this.trainParams, new DoccatFactory());
                 // the second argument of 'evaluate()' gives number of folds (n): number of times the training-testing will be run (with data splitting train:test = (n-1):1)
                 evaluator.evaluate(sampleStream, this.nFolds);
@@ -112,9 +112,9 @@ public class SentimentModelTool extends OpenNLPGenericModelTool {
     }
 
     public String test(String file, DocumentCategorizerME modelME) {
-        LOG.info("Starting testing of " + MODEL_NAME + " ...");
         String result = "";
         try (ObjectStream<String> lineStream = openFile(file); ObjectStream<DocumentSample> sampleStreamValidate = new DocumentSampleStream(lineStream)) {
+            LOG.info("Testing of " + MODEL_NAME + " started ...");
             //DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(new DocumentCategorizerME((DoccatModel) this.model));
             DocumentCategorizerEvaluator evaluator = new DocumentCategorizerEvaluator(modelME);
             evaluator.evaluate(sampleStreamValidate);

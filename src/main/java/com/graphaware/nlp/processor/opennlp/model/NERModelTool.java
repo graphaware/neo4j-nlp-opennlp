@@ -49,8 +49,8 @@ public class NERModelTool extends OpenNLPGenericModelTool {
     }
 
     public void train() {
-        LOG.info("Starting training of " + MODEL_NAME + " ...");
         try (ObjectStream<String> lineStream = openFile(fileIn); NameSampleDataStream sampleStream = new NameSampleDataStream(lineStream)) {
+            LOG.info("Training of " + MODEL_NAME + " started ...");
             this.model = NameFinderME.train(lang, entityType, sampleStream, trainParams, new TokenNameFinderFactory());
         } catch (IOException ex) {
             LOG.error("Error while opening training file: " + fileIn, ex);
@@ -62,11 +62,11 @@ public class NERModelTool extends OpenNLPGenericModelTool {
     }
 
     public String validate() {
-        LOG.info("Starting validation of " + MODEL_NAME + " ...");
         String result = "";
         if (this.fileValidate == null) {
             //List<EvaluationMonitor<NameSample>> listeners = new LinkedList<EvaluationMonitor<NameSample>>();
             try (ObjectStream<String> lineStream = openFile(fileIn); NameSampleDataStream sampleStream = new NameSampleDataStream(lineStream)) {
+                LOG.info("Validation of " + MODEL_NAME + " started ...");
                 // Using CrossValidator
                 TokenNameFinderCrossValidator evaluator = new TokenNameFinderCrossValidator(lang, entityType, trainParams, null);
                 // the second argument of 'evaluate()' gives number of folds (n), i.e. number of times the training-testing will be run (with data splitting train:test = (n-1):1)
@@ -90,9 +90,9 @@ public class NERModelTool extends OpenNLPGenericModelTool {
     }
 
     public String test(String file, NameFinderME modelME) {
-        LOG.info("Starting testing of " + MODEL_NAME + " ...");
         String result = "";
         try (ObjectStream<String> lineStreamValidate = openFile(file); NameSampleDataStream sampleStreamValidate = new NameSampleDataStream(lineStreamValidate)) {
+            LOG.info("Testing of " + MODEL_NAME + " started ...");
             //TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(new NameFinderME((TokenNameFinderModel) model));
             TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(modelME);
             evaluator.evaluate(sampleStreamValidate);
