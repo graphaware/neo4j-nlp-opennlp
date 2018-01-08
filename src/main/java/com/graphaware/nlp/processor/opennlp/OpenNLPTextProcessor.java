@@ -147,9 +147,9 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         return options;
     }
     
-    protected Map<String, Boolean> buildSpecifications(List<String> actives) {
+    protected Map<String, Object> buildSpecifications(List<String> actives) {
         List<String> all = Arrays.asList("tokenize", "ner", "cleanxml", "truecase", "dependency", "relations", "checkLemmaIsStopWord", "coref", "sentiment", "phrase", "customSentiment", "customNER");
-        Map<String, Boolean> specs = new HashMap<>();
+        Map<String, Object> specs = new HashMap<>();
         all.forEach(s -> {
             specs.put(s, actives.contains(s));
         });
