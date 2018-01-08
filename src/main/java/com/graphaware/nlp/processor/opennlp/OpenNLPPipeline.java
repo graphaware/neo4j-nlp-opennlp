@@ -365,7 +365,7 @@ public class OpenNLPPipeline {
             sentModel.train();
             result = sentModel.validate();
             String[] dirPathSplit = fileTrain.split(File.separator);
-            String fileOutToUse = null;
+            String fileOutToUse;
             if (dirPathSplit.length > 2) {
                 StringBuilder sb = new StringBuilder("");
                 for (int i = 0; i < dirPathSplit.length -2; ++i) {
