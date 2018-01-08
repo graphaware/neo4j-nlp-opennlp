@@ -96,41 +96,54 @@
       <artifactId>slf4j-simple</artifactId>
       <version>1.7.21</version>
     </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.12</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>runtime</artifactId>
       <version>${graphaware.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>server</artifactId>
       <version>${graphaware.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>tests</artifactId>
       <version>${graphaware.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>resttest</artifactId>
       <scope>test</scope>
       <version>${resttest.version}</version>
     </dependency>
+
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>nlp</artifactId>
       <version>3.3.1.51.3-SNAPSHOT</version>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-server</artifactId>
+      <version>1.19.1</version>
       <scope>test</scope>
     </dependency>
 

@@ -364,10 +364,22 @@ public class OpenNLPPipeline {
             SentimentModelTool sentModel = new SentimentModelTool(fileTrain, modelId, lang, params);
             sentModel.train();
             result = sentModel.validate();
-            sentModel.saveModel(fileOut);
+            String[] dirPathSplit = fileTrain.split(File.separator);
+            String fileOutToUse = null;
+            if (dirPathSplit.length > 2) {
+                StringBuilder sb = new StringBuilder("");
+                for (int i = 0; i < dirPathSplit.length -2; ++i) {
+                    sb.append(dirPathSplit[i]).append(File.separator);
+                }
+                fileOutToUse = sb.toString() + fileOut;
+            } else {
+                fileOutToUse = fileOut;
+            }
+            System.out.println("Saving model to " + fileOutToUse);
+            sentModel.saveModel(fileOutToUse);
             // incorporate this model to the OpenNLPPipeline
             if (sentModel.getModel() != null) {
-                customSentimentModels.put(newKey, fileOut);
+                customSentimentModels.put(newKey, fileOutToUse);
                 //sentimentDetectors.put(newKey, new DocumentCategorizerME((DoccatModel) sentModel.getModel()));
             }
         } else {

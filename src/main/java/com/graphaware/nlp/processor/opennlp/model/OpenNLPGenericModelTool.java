@@ -211,7 +211,7 @@ public class OpenNLPGenericModelTool {
             }
             try {
                 if (this.inputSourceStr.startsWith("file://")) {
-                    this.inputSourceFile = new File(new URI(this.inputSourceStr));
+                    this.inputSourceFile = new File(new URI(this.inputSourceStr.replace("file://", "")));
                 } else if (this.inputSourceStr.startsWith("/")) {
                     this.inputSourceFile = new File(this.inputSourceStr);
                 }
