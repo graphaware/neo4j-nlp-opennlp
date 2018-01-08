@@ -19,17 +19,12 @@ import com.graphaware.nlp.annotation.NLPTextProcessor;
 import com.graphaware.nlp.domain.*;
 import com.graphaware.nlp.dsl.request.PipelineSpecification;
 import com.graphaware.nlp.processor.AbstractTextProcessor;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.graphaware.nlp.processor.PipelineInfo;
-import java.util.Arrays;
 import opennlp.tools.util.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +33,7 @@ import org.slf4j.LoggerFactory;
 public class OpenNLPTextProcessor extends AbstractTextProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenNLPTextProcessor.class);
+    private static final String CORE_PIPELINE_NAME = "CORE_OpenNLPTextProcessor";
     public static final String TOKENIZER = "tokenizer";
     public static final String SENTIMENT = "sentiment";
     public static final String TOKENIZER_AND_SENTIMENT = "tokenizerAndSentiment";
@@ -52,6 +48,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         if (initiated) {
             return;
         }
+        createFullPipeline();
         createTokenizerPipeline();
         createSentimentPipeline();
         createTokenizerAndSentimentPipeline();
@@ -70,41 +67,7 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
         return null;
     }
 
-    private void createTokenizerPipeline() {
-        OpenNLPPipeline pipeline = new PipelineBuilder()
-                .tokenize()
-                .extractNEs()
-                .defaultStopWordAnnotator()
-                .threadNumber(6)
-                .build();
-        pipelines.put(TOKENIZER, pipeline);
-        pipelineInfos.put(TOKENIZER, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("tokenize", "ner")));
-    }
-
-    private void createSentimentPipeline() {
-        OpenNLPPipeline pipeline = new PipelineBuilder()
-                .tokenize()
-                //.extractNEs()
-                .extractSentiment()
-                .threadNumber(6)
-                .build();
-        pipelines.put(SENTIMENT, pipeline);
-        pipelineInfos.put(SENTIMENT, createPipelineInfo(SENTIMENT, pipeline, Arrays.asList("sentiment")));
-    }
-
-    private void createTokenizerAndSentimentPipeline() {
-        OpenNLPPipeline pipeline = new PipelineBuilder()
-                .tokenize()
-                .extractNEs()
-                .defaultStopWordAnnotator()
-                .extractSentiment()
-                .threadNumber(6)
-                .build();
-        pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
-        pipelineInfos.put(TOKENIZER_AND_SENTIMENT, createPipelineInfo(TOKENIZER_AND_SENTIMENT, pipeline, Arrays.asList("tokenize", "ner", "sentiment")));
-    }
-
-    private void createPhrasePipeline() {
+    private void createFullPipeline() {
         OpenNLPPipeline pipeline = new PipelineBuilder()
                 .tokenize()
                 .extractNEs()
@@ -113,9 +76,57 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 .extractSentiment()
                 .threadNumber(6)
                 .build();
+        pipelines.put(CORE_PIPELINE_NAME, pipeline);
+        pipelineInfos.put(CORE_PIPELINE_NAME, createPipelineInfo(CORE_PIPELINE_NAME, pipeline, Arrays.asList("tokenize", "ner", "coref", "relations", "sentiment", "phrase")));
+    }
+
+    private void createTokenizerPipeline() {
+        OpenNLPPipeline pipeline = pipelines.get(CORE_PIPELINE_NAME);
+        pipelines.put(TOKENIZER, pipeline);
+        pipelineInfos.put(TOKENIZER, createPipelineInfo(TOKENIZER, pipeline, Arrays.asList("tokenize", "ner")));
+    }
+
+    private void createSentimentPipeline() {
+        OpenNLPPipeline pipeline = pipelines.get(CORE_PIPELINE_NAME);
+        pipelines.put(SENTIMENT, pipeline);
+        pipelineInfos.put(SENTIMENT, createPipelineInfo(SENTIMENT, pipeline, Arrays.asList("sentiment")));
+    }
+
+    private void createTokenizerAndSentimentPipeline() {
+        OpenNLPPipeline pipeline = pipelines.get(CORE_PIPELINE_NAME);
+        pipelines.put(TOKENIZER_AND_SENTIMENT, pipeline);
+        pipelineInfos.put(TOKENIZER_AND_SENTIMENT, createPipelineInfo(TOKENIZER_AND_SENTIMENT, pipeline, Arrays.asList("tokenize", "ner", "sentiment")));
+    }
+
+    private void createPhrasePipeline() {
+        OpenNLPPipeline pipeline = pipelines.get(CORE_PIPELINE_NAME);
         pipelines.put(PHRASE, pipeline);
-        //pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("phrase")));
         pipelineInfos.put(PHRASE, createPipelineInfo(PHRASE, pipeline, Arrays.asList("tokenize", "ner", "coref", "relations", "sentiment", "phrase")));
+    }
+
+    @Override
+    public AnnotatedText annotateText(String text, String lang, PipelineSpecification pipelineSpecification) {
+        OpenNLPPipeline pipeline = pipelines.get(CORE_PIPELINE_NAME);
+        OpenNLPAnnotation document = new OpenNLPAnnotation(text, Collections.EMPTY_MAP);
+        pipeline.annotate(document);
+
+        AnnotatedText result = new AnnotatedText();
+        List<OpenNLPAnnotation.Sentence> sentences = document.getSentences();
+        final AtomicInteger sentenceSequence = new AtomicInteger(0);
+        sentences.stream().forEach((sentence) -> {
+            int sentenceNumber = sentenceSequence.getAndIncrement();
+            final Sentence newSentence = new Sentence(sentence.getSentence(), sentenceNumber);
+            extractTokens(lang, sentence, newSentence);
+            if (pipelineSpecification.hasProcessingStep(SENTIMENT)) {
+                extractSentiment(sentence, newSentence);
+            }
+            if (pipelineSpecification.hasProcessingStep(PHRASE)) {
+                extractPhrases(sentence, newSentence);
+            }
+            result.addSentence(newSentence);
+        });
+
+        return result;
     }
 
     protected PipelineInfo createPipelineInfo(String name, OpenNLPPipeline pipeline, List<String> actives) {
