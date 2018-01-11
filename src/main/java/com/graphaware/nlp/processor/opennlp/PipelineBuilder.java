@@ -58,6 +58,7 @@ class PipelineBuilder {
     }
 
     public PipelineBuilder extractCustomSentiment(String sent) {
+        System.out.println("Adding custom sentiment model from " + sent);
         properties.setProperty("customSentiment", sent);
         return this;
     }

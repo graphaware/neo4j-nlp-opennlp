@@ -34,5 +34,4 @@ public class CustomSentimentModelIntegrationTest extends NLPIntegrationTest {
             }
         }));
     }
-
 }

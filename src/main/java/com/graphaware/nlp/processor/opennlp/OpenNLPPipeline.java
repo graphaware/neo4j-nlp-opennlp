@@ -103,10 +103,22 @@ public class OpenNLPPipeline {
     }
 
     public OpenNLPPipeline(Properties properties) {
-        findModelFiles(IMPORT_DIRECTORY);
+//        findModelFiles(IMPORT_DIRECTORY);
+        detectSentimentModelToMap(properties);
         this.annotators = Arrays.asList(properties.getProperty("annotators", "").split(",")).stream().map(str -> str.trim()).collect(Collectors.toList());
         this.stopWords = Arrays.asList(properties.getProperty("stopword", "").split(",")).stream().map(str -> str.trim().toLowerCase()).collect(Collectors.toList());
         init(properties);
+    }
+
+    private void detectSentimentModelToMap(Properties properties) {
+        if (properties.containsKey("customSentiment")) {
+            String filename = properties.getProperty("customSentiment");
+            System.out.println("115: Custom sentiment found in properties at path " + filename);
+            String[] parts = filename.split("/");
+            String modelId = parts[parts.length-1].replaceAll(".bin","").replaceAll("sentiment-","").trim();
+            customSentimentModels.put(modelId, filename);
+            System.out.println(String.format("Added model %s at path %s", modelId, filename));
+        }
     }
 
     private void init(Properties properties) {
@@ -207,12 +219,14 @@ public class OpenNLPPipeline {
         else {
             String customModel = properties.getProperty("customSentiment");
             LOG.info("Extracting custom sentiment model: " + customModel);
-            if (!customSentimentModels.containsKey(customModel)) {
+            System.out.println(String.format("Looking for model %s", customModel));
+            System.out.println(customSentimentModels.keySet());
+            if (!customSentimentModels.containsValue(customModel)) {
                 LOG.error("Custom sentiment model " + customModel + " not found!");
                 throw new RuntimeException("Custom sentiment model " + customModel + " not found!");
             }
             try {
-                InputStream is = new FileInputStream(new File(customSentimentModels.get(customModel)));
+                InputStream is = new FileInputStream(new File(customModel));
                 if (is == null) {
                     LOG.error("Custom sentiment model: input stream is null");
                     return;

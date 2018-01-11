@@ -583,22 +583,32 @@ public class OpenNLPTextProcessor extends AbstractTextProcessor {
                 specActive.add("sentiment");
             }
             specActive.add("customSentiment");
-            pipelineBuilder.extractCustomSentiment(pipelineSpecification.getProcessingStepAsString("customSentiment"));
+            if (!pipelineSpecification.getCustomModelPaths().containsKey("customSentiment") || null == pipelineSpecification.getCustomModelPaths().get("customSentiment")) {
+                LOG.error("Pipeline specification is stale and do not contain path to custom sentiment model");
+                LOG.error("Skipping pipeline " + pipelineSpecification.getName());
+                return;
+            }
+            pipelineBuilder.extractCustomSentiment(pipelineSpecification.getCustomModelPaths().get("customSentiment"));
         }
         Long threadNumber = pipelineSpecification.getThreadNumber() != 0 ? pipelineSpecification.getThreadNumber() : 4L;
         pipelineBuilder.threadNumber(threadNumber.intValue());
 
-        OpenNLPPipeline pipeline = pipelineBuilder.build();
-        pipelines.put(name, pipeline);
-        PipelineInfo pipelineInfo = new PipelineInfo(
-                name,
-                this.getClass().getName(),
-                getPipelineProperties(pipeline),
-                buildSpecifications(specActive),
-                Integer.valueOf(threadNumber.toString()),
-                stopwordsList
-        );
-        pipelineInfos.put(name, pipelineInfo);
+        try {
+            OpenNLPPipeline pipeline = pipelineBuilder.build();
+            pipelines.put(name, pipeline);
+            PipelineInfo pipelineInfo = new PipelineInfo(
+                    name,
+                    this.getClass().getName(),
+                    getPipelineProperties(pipeline),
+                    buildSpecifications(specActive),
+                    Integer.valueOf(threadNumber.toString()),
+                    stopwordsList
+            );
+            pipelineInfos.put(name, pipelineInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+            LOG.error(e.getMessage());
+        }
     }
 
     @Override
