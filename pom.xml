@@ -4,7 +4,7 @@
 
   <groupId>com.graphaware.neo4j</groupId>
   <artifactId>nlp-opennlp</artifactId>
-  <version>3.3.2.51.5-SNAPSHOT</version>
+  <version>3.3.2.51.6-SNAPSHOT</version>
 
   <licenses>
     <license>
