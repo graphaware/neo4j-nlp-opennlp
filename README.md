@@ -65,6 +65,10 @@ MATCH (result)-[:CONTAINS_SENTENCE]->(s:Sentence)
 RETURN labels(s) as labels
 ```
 
+
+
+
+## BETA
 ### Customizing pipeline models
 To add new customized model (currenlty NER and Sentiment), one can do it via Cypher:
 ```

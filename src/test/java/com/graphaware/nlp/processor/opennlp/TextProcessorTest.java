@@ -26,6 +26,8 @@ import com.graphaware.test.integration.EmbeddedDatabaseIntegrationTest;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.QueryExecutionException;
@@ -38,14 +40,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
-public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
+public class TextProcessorTest extends OpenNLPIntegrationTest {
 
+    private static TextProcessor textProcessor;
     private static final String TEXT_PROCESSOR = "com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor";
+
+    @BeforeClass
+    public static void init() {
+        textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
+        textProcessor.init();
+    }
 
     @Test
     public void testAnnotatedText() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         AnnotatedText annotatedText = textProcessor.annotateText("On 8 May 2013, "
                 + "one week before the Pakistani election, the third author, "
                 + "in his keynote address at the Sentiment Analysis Symposium, "
@@ -72,8 +79,6 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
     @Test
     public void testLemmaLowerCasing() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         AnnotatedText annotateText = textProcessor.annotateText("Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset", OpenNLPTextProcessor.TOKENIZER, "en", null);
 
         assertEquals(1, annotateText.getSentences().size());
@@ -112,43 +117,39 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
     @Test
     public void testAnnotatedTag() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         Tag annotateTag = textProcessor.annotateTag("winners", "en");
         assertEquals(annotateTag.getLemma(), "winner");
     }
 
-    @Test
-    public void testAnnotationAndConcept() {
-        // ConceptNet5Importer.Builder() - arguments need fixing
-        /*TextProcessor textProcessor = ServiceLoader.loadTextProcessor("com.graphaware.nlp.processor.stanford.StanfordTextProcessor");
-        ConceptNet5Importer conceptnet5Importer = new ConceptNet5Importer.Builder("http://conceptnet5.media.mit.edu/data/5.4", textProcessor)
-                .build();
-        String text = "Say hi to Christophe";
-        AnnotatedText annotateText = textProcessor.annotateText(text, 1, 0, "en", false);
-        List<Node> nodes = new ArrayList<>();
-        try (Transaction beginTx = getDatabase().beginTx()) {
-            Node annotatedNode = annotateText.storeOnGraph(getDatabase(), false);
-            Map<String, Object> params = new HashMap<>();
-            params.put("id", annotatedNode.getId());
-            Result queryRes = getDatabase().execute("MATCH (n:AnnotatedText)-[*..2]->(t:Tag) where id(n) = {id} return t", params);
-            ResourceIterator<Node> tags = queryRes.columnAs("t");
-            while (tags.hasNext()) {
-                Node tag = tags.next();
-                nodes.add(tag);
-                List<Tag> conceptTags = conceptnet5Importer.importHierarchy(Tag.createTag(tag), "en");
-                conceptTags.stream().forEach((newTag) -> {
-                    nodes.add(newTag.storeOnGraph(getDatabase(), false));
-                });
-            }
-            beginTx.success();
-        }*/
-    }
+//    @Test
+//    public void testAnnotationAndConcept() {
+//        // ConceptNet5Importer.Builder() - arguments need fixing
+//        /*TextProcessor textProcessor = ServiceLoader.loadTextProcessor("com.graphaware.nlp.processor.stanford.StanfordTextProcessor");
+//        ConceptNet5Importer conceptnet5Importer = new ConceptNet5Importer.Builder("http://conceptnet5.media.mit.edu/data/5.4", textProcessor)
+//                .build();
+//        String text = "Say hi to Christophe";
+//        AnnotatedText annotateText = textProcessor.annotateText(text, 1, 0, "en", false);
+//        List<Node> nodes = new ArrayList<>();
+//        try (Transaction beginTx = getDatabase().beginTx()) {
+//            Node annotatedNode = annotateText.storeOnGraph(getDatabase(), false);
+//            Map<String, Object> params = new HashMap<>();
+//            params.put("id", annotatedNode.getId());
+//            Result queryRes = getDatabase().execute("MATCH (n:AnnotatedText)-[*..2]->(t:Tag) where id(n) = {id} return t", params);
+//            ResourceIterator<Node> tags = queryRes.columnAs("t");
+//            while (tags.hasNext()) {
+//                Node tag = tags.next();
+//                nodes.add(tag);
+//                List<Tag> conceptTags = conceptnet5Importer.importHierarchy(Tag.createTag(tag), "en");
+//                conceptTags.stream().forEach((newTag) -> {
+//                    nodes.add(newTag.storeOnGraph(getDatabase(), false));
+//                });
+//            }
+//            beginTx.success();
+//        }*/
+//    }
 
     //@Test
     public void testSentiment() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-
         AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(0, annotateText.getSentences().get(0).getSentiment());
@@ -172,8 +173,6 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
     @Test
     public void testAnnotatedTextWithPosition() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         AnnotatedText annotateText = textProcessor.annotateText("On 8 May 2013, "
                 + "one week before the Pakistani election, the third author, "
                 + "in his keynote address at the Sentiment Analysis Symposium, "
@@ -217,8 +216,6 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
     @Test
     public void testAnnotatedShortText() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem", OpenNLPTextProcessor.TOKENIZER, "en", null);
 
         assertEquals(1, annotateText.getSentences().size());
@@ -230,8 +227,6 @@ public class TextProcessorTest extends EmbeddedDatabaseIntegrationTest {
 
     @Test
     public void testAnnotatedShortText2() {
-        TextProcessor textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
-        textProcessor.init();
         AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing", OpenNLPTextProcessor.TOKENIZER, "en", null);
         assertEquals(1, annotateText.getSentences().size());
 //        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());

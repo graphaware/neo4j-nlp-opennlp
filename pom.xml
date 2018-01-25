@@ -4,7 +4,7 @@
 
   <groupId>com.graphaware.neo4j</groupId>
   <artifactId>nlp-opennlp</artifactId>
-  <version>3.3.1.51.3-SNAPSHOT</version>
+  <version>3.3.2.51.5-SNAPSHOT</version>
 
   <licenses>
     <license>
@@ -13,6 +13,10 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
+
+  <name>GraphAware OpenNLP Integration</name>
+  <description>OpenNLP integration into GraphAware NLP</description>
+  <url>https://graphaware.com</url>
 
   <scm>
     <connection>scm:git:git@github.com:graphaware/neo4j-nlp-opennlp.git</connection>
@@ -60,16 +64,17 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <graphaware.version>3.3.1.51</graphaware.version>
-    <resttest.version>3.3.1.51.18</resttest.version>
-    <neo4j.version>3.3.1</neo4j.version>
+    <graphaware.version>3.3.2.51</graphaware.version>
+    <resttest.version>3.3.2.51.18</resttest.version>
+    <neo4j.version>3.3.2</neo4j.version>
+    <nlp.version>3.3.2.51.4</nlp.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>nlp</artifactId>
-      <version>3.3.1.51.3-SNAPSHOT</version>
+      <version>${nlp.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -135,7 +140,7 @@
     <dependency>
       <groupId>com.graphaware.neo4j</groupId>
       <artifactId>nlp</artifactId>
-      <version>3.3.1.51.3-SNAPSHOT</version>
+      <version>${nlp.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
@@ -221,7 +226,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.20</version>
         <configuration>
-          <argLine>-Xmx4g</argLine>
+          <argLine>-Xmx8g</argLine>
         </configuration>
       </plugin>
     </plugins>

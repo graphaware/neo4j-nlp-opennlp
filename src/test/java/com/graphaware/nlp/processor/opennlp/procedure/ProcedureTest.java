@@ -17,6 +17,7 @@ package com.graphaware.nlp.processor.opennlp.procedure;
 
 import com.graphaware.nlp.module.NLPConfiguration;
 import com.graphaware.nlp.module.NLPModule;
+import com.graphaware.nlp.processor.opennlp.OpenNLPIntegrationTest;
 import com.graphaware.runtime.GraphAwareRuntime;
 import com.graphaware.runtime.GraphAwareRuntimeFactory;
 import com.graphaware.test.integration.GraphAwareIntegrationTest;
@@ -32,7 +33,7 @@ import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 
-public class ProcedureTest extends GraphAwareIntegrationTest {
+public class ProcedureTest extends OpenNLPIntegrationTest {
     
 
     private static final String TEXT = "On 8 May 2013, "

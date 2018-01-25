@@ -1,13 +1,13 @@
 package com.graphaware.nlp.processor.opennlp.model;
 
-import com.graphaware.nlp.NLPIntegrationTest;
+import com.graphaware.nlp.processor.opennlp.OpenNLPIntegrationTest;
 import org.junit.Test;
 
 import java.util.Map;
 
 import static org.junit.Assert.*;
 
-public class CustomSentimentModelIntegrationTest extends NLPIntegrationTest {
+public class CustomSentimentModelIntegrationTest extends OpenNLPIntegrationTest {
 
     @Test
     public void testTrainCustomModelWithProcedure() {
