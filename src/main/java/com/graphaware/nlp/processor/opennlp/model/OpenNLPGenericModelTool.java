@@ -77,11 +77,11 @@ public class OpenNLPGenericModelTool {
         }
         ObjectStream<String> lStream = null;
         try {
-            ImprovisedInputStreamFactory dataIn = new ImprovisedInputStreamFactory(null, "", fileName);
+            ImprovisedInputStreamFactory dataIn = new ImprovisedInputStreamFactory(new Properties(), "", fileName);
             lStream = new PlainTextByLineStream(dataIn, "UTF-8");
-        } catch (IOException ex) {
-            LOG.error("Failure while opening file " + fileName, ex);
-            throw new RuntimeException("Failure while opening file " + fileName, ex);
+        } catch (Exception ex) {
+            LOG.error("Unable to open file " + fileName, ex);
+            throw new RuntimeException("Unable to open file " + fileName, ex);
         }
 
         if (lStream == null)
@@ -188,7 +188,7 @@ public class OpenNLPGenericModelTool {
             modelOut.close();
         } catch (IOException ex) {
             LOG.error("Error saving model to file " + file, ex);
-            throw new RuntimeException("Error saving model to file " + file, ex);
+            throw new RuntimeException(ex);
         }
 
         //this.closeInputFile();

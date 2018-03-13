@@ -56,8 +56,9 @@ public class NERModelTool extends OpenNLPGenericModelTool {
             LOG.error("Error while opening training file: " + fileIn, ex);
             throw new RuntimeException("Error while training " + MODEL_NAME + " model " + this.modelDescr, ex);
         } catch (Exception ex) {
-            LOG.error("Error while training " + MODEL_NAME + " model " + modelDescr);
-            throw new RuntimeException("Error while training " + MODEL_NAME + " model " + this.modelDescr, ex);
+            LOG.error("Error while training " + MODEL_NAME + " model " + modelDescr + ". " + ex.getMessage());
+            ex.printStackTrace();
+            throw new RuntimeException(ex);
         }
     }
 
@@ -77,10 +78,10 @@ public class NERModelTool extends OpenNLPGenericModelTool {
                 LOG.info("Validation: " + result);
             } catch (IOException ex) {
                 LOG.error("Error while opening training file: " + fileIn, ex);
-                throw new RuntimeException("IOError while evaluating " + MODEL_NAME + " model " + modelDescr, ex);
+                throw new RuntimeException(ex);
             } catch (Exception ex) {
                 LOG.error("Error while evaluating " + MODEL_NAME + " model.", ex);
-                throw new RuntimeException("Error while evaluating " + MODEL_NAME + " model " + modelDescr, ex);
+                throw new RuntimeException(ex);
             }
         } else {
           result = test(this.fileValidate, new NameFinderME((TokenNameFinderModel) model));
