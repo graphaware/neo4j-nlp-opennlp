@@ -22,7 +22,7 @@ public class CustomNERIntegrationTest extends OpenNLPIntegrationTest {
         executeInTransaction(addPipelineQuery, emptyConsumer());
 
 
-        String textNew = "Mrs Kus said she intended to form a government.";
+        String textNew = "Mr Kus said he intended to form a government.";
         executeInTransaction("CALL ga.nlp.annotate({text: {text}, id:'test-ner', pipeline:'customNER', textProcessor: 'com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor'}) YIELD result RETURN result", Collections.singletonMap("text", textNew), result -> {
             assertTrue(result.hasNext());
         });
