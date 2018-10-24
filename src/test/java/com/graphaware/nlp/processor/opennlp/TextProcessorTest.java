@@ -18,6 +18,8 @@ package com.graphaware.nlp.processor.opennlp;
 import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Sentence;
 import com.graphaware.nlp.domain.Tag;
+import com.graphaware.nlp.dsl.request.PipelineSpecification;
+import com.graphaware.nlp.processor.AbstractTextProcessor;
 import com.graphaware.nlp.processor.TextProcessor;
 import com.graphaware.nlp.util.ServiceLoader;
 import com.graphaware.nlp.util.TestAnnotatedText;
@@ -44,11 +46,18 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     private static TextProcessor textProcessor;
     private static final String TEXT_PROCESSOR = "com.graphaware.nlp.processor.opennlp.OpenNLPTextProcessor";
+    private static PipelineSpecification PIPELINE_DEFAULT;
 
     @BeforeClass
     public static void init() {
         textProcessor = ServiceLoader.loadTextProcessor(TEXT_PROCESSOR);
         textProcessor.init();
+        Map<String, Object> processingSteps = new HashMap<>();
+        processingSteps.put(AbstractTextProcessor.STEP_TOKENIZE, true);
+        processingSteps.put(AbstractTextProcessor.STEP_NER, true);
+        PipelineSpecification pipelineSpecification = new PipelineSpecification("default", OpenNLPTextProcessor.class.getName(), processingSteps, null, 1L, Collections.emptyList(), Collections.emptyList());
+        PIPELINE_DEFAULT = pipelineSpecification;
+        textProcessor.createPipeline(PIPELINE_DEFAULT);
     }
 
     @Test
@@ -63,7 +72,7 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
                 + "an article titled “Pakistan Elections: Five Reasons Why the "
                 + "Vote is Unpredictable,”1 in which he claimed that the election "
                 + "was too close to call. It was not, and despite his being in Pakistan, "
-                + "the outcome of the election was exactly as we predicted.", OpenNLPTextProcessor.TOKENIZER, "en", null);
+                + "the outcome of the election was exactly as we predicted.", "en", PIPELINE_DEFAULT);
 
         TestAnnotatedText test = new TestAnnotatedText(annotatedText);
         test.assertSentencesCount(4);
@@ -79,7 +88,9 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     @Test
     public void testLemmaLowerCasing() {
-        AnnotatedText annotateText = textProcessor.annotateText("Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText(
+                "Collibra’s Data Governance Innovation: Enabling Data as a Strategic Asset",
+                "en", PIPELINE_DEFAULT);
 
         assertEquals(1, annotateText.getSentences().size());
         assertEquals("governance", annotateText.getSentences().get(0).getTagOccurrence(16).getLemma());
@@ -117,7 +128,7 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     @Test
     public void testAnnotatedTag() {
-        Tag annotateTag = textProcessor.annotateTag("winners", "en");
+        Tag annotateTag = textProcessor.annotateTag("winners", "en", PIPELINE_DEFAULT);
         assertEquals(annotateTag.getLemma(), "winner");
     }
 
@@ -150,23 +161,28 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     //@Test
     public void testSentiment() {
-        AnnotatedText annotateText = textProcessor.annotateText("I really hate to study at Stanford, it was a waste of time, I'll never be there again", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText(
+                "I really hate to study at Stanford, "
+                        + "it was a waste of time, I'll never be there again", "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(0, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("It was really horrible to study at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText(
+                "It was really horrible to study at Stanford", "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(1, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I studied at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("I studied at Stanford", "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(2, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked to study at Stanford", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText("I liked to study at Stanford", "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(3, annotateText.getSentences().get(0).getSentiment());
 
-        annotateText = textProcessor.annotateText("I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        annotateText = textProcessor.annotateText(
+                "I liked so much to study at Stanford, I enjoyed my time there, I would recommend every body",
+                "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
         assertEquals(4, annotateText.getSentences().get(0).getSentiment());
     }
@@ -183,7 +199,7 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
                 + "an article titled “Pakistan Elections: Five Reasons Why the "
                 + "Vote is Unpredictable,”1 in which he claimed that the election "
                 + "was too close to call. It was not, and despite his being in Pakistan, "
-                + "the outcome of the election was exactly as we predicted.", "phrase", "en", null);
+                + "the outcome of the election was exactly as we predicted.", "en", PIPELINE_DEFAULT);
 
         assertEquals(4, annotateText.getSentences().size());
         Sentence sentence1 = annotateText.getSentences().get(0);
@@ -216,7 +232,8 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     @Test
     public void testAnnotatedShortText() {
-        AnnotatedText annotateText = textProcessor.annotateText("Fixing Batch Endpoint Logging Problem", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText(
+                "Fixing Batch Endpoint Logging Problem", "en", PIPELINE_DEFAULT);
 
         assertEquals(1, annotateText.getSentences().size());
 //
@@ -227,7 +244,8 @@ public class TextProcessorTest extends OpenNLPIntegrationTest {
 
     @Test
     public void testAnnotatedShortText2() {
-        AnnotatedText annotateText = textProcessor.annotateText("Importing CSV data does nothing", OpenNLPTextProcessor.TOKENIZER, "en", null);
+        AnnotatedText annotateText = textProcessor.annotateText(
+                "Importing CSV data does nothing", "en", PIPELINE_DEFAULT);
         assertEquals(1, annotateText.getSentences().size());
 //        GraphPersistence peristence = new LocalGraphDatabase(getDatabase());
 //        peristence.persistOnGraph(annotateText, false);
