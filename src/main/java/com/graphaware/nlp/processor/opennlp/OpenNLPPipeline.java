@@ -351,13 +351,24 @@ public class OpenNLPPipeline {
             NERModelTool nerModel = new NERModelTool(fileTrain, modelId, lang, params);
             nerModel.train();
             result = nerModel.validate();
-            nerModel.saveModel(fileOut);
+            String[] dirPathSplit = fileTrain.split(File.separator);
+            String fileOutToUse;
+            if (dirPathSplit.length > 2) {
+                StringBuilder sb = new StringBuilder("");
+                for (int i = 0; i < dirPathSplit.length -2; ++i) {
+                    sb.append(dirPathSplit[i]).append(File.separator);
+                }
+                fileOutToUse = sb.toString() + fileOut;
+            } else {
+                fileOutToUse = fileOut;
+            }
+            nerModel.saveModel(fileOutToUse);
             // incorporate this model to the OpenNLPPipeline
             if (nerModel.getModel() != null) {
-                customNeModels.put(newKey, fileOut);
-                /*if (!nameDetectors.containsKey(newKey)) {
+                customNeModels.put(newKey, fileOutToUse);
+                if (!nameDetectors.containsKey(newKey)) {
                     nameDetectors.put(newKey, new NameFinderME((TokenNameFinderModel) nerModel.getModel()));
-                }*/
+                }
             }
         }
         else if (alg.toLowerCase().equals("sentiment")) {
